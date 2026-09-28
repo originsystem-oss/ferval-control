@@ -62,10 +62,10 @@
       <button id="tileGuardia" class="tile n1only"><div class="tileIcon">🚨</div><strong>Guardia Dirección</strong><span>Incidencias y bloqueos</span></button>
       <button id="tileAyuda" class="tile"><div class="tileIcon">❓</div><strong>Ayuda</strong><span>Cómo usar FERVAL CONTROL</span></button>
     </div>
-    <section id="pushSetupCard" class="sectionCard hidden"><h3>🔔 Avisos urgentes</h3><div id="pushStatus" class="muted">Activa las notificaciones para recibir avisos de Dirección aunque la app esté cerrada.</div><button id="enablePushBtn" class="btn primary full" style="margin-top:10px">Activar notificaciones</button></section>
+    <section id="pushSetupCard" class="sectionCard"><h3>🔔 Avisos urgentes</h3><div id="pushStatus" class="muted">Activa las notificaciones para recibir avisos de Dirección aunque la app esté cerrada.</div><button id="enablePushBtn" class="btn primary full" style="margin-top:10px">Activar notificaciones</button></section>
     <section id="notificationsCard" class="sectionCard"><h3>Avisos</h3><div id="homeNotifications" class="muted">Sin avisos nuevos.</div></section>
-    <section id="homePendingCard" class="sectionCard"><h3>Usuarios pendientes</h3><div id="homePending" class="muted">Cargando…</div></section>
-    <section id="homeAuditCard" class="sectionCard"><h3>Historial de Dirección</h3><div id="homeAudit" class="muted">Cargando…</div></section>
+    <section id="homePendingCard" class="sectionCard" style="display:none"><h3>Usuarios pendientes</h3><div id="homePending" class="muted">Cargando…</div></section>
+    <section id="homeAuditCard" class="sectionCard" style="display:none"><h3>Historial de Dirección</h3><div id="homeAudit" class="muted">Cargando…</div></section>
   </main>
 
   <main id="chatView" class="view chatView hidden">
@@ -276,7 +276,7 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='3.7';
+const APP_VERSION='3.9';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
 const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','controlDiarioView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
@@ -719,7 +719,7 @@ async function boot(){
     $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     const sessionKey='ferval_'+APP_VERSION+'_'+me.user_id;
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
-    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia','tileControlDiario'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);$('homePendingCard').classList.toggle('hidden',!n1);$('homeAuditCard').classList.toggle('hidden',!n1);if(!n1){$('homePendingCard').style.display='none';$('homeAuditCard').style.display='none'}else{$('homePendingCard').style.display='';$('homeAuditCard').style.display=''}$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
+    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia','tileControlDiario'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);if(n1){$('homePendingCard').style.display='';$('homeAuditCard').style.display='';$('pushSetupCard').style.display='none'}else{$('homePendingCard').style.display='none';$('homeAuditCard').style.display='none';$('pushSetupCard').style.display=''}$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
     await loadNotifications();
     if(n1){await loadDirectionAlerts();await loadUsers();await loadAudit()}else{await setupPushUI();await loadDirectionWork();await pollDirectionNotifications()}
     await loadHistory();showView('homeView');
