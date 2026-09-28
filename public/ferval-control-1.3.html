@@ -276,7 +276,7 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='3.6';
+const APP_VERSION='3.7';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
 const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','controlDiarioView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
@@ -707,13 +707,19 @@ async function createNewConversation(){
 async function loadHistory(){const {data:{session}}=await sb.auth.getSession();const r=await fetch(FN+'/history?sid='+encodeURIComponent(sid),{headers:{Authorization:'Bearer '+session.access_token}});const j=await r.json();$('chat').innerHTML='';for(const x of j.history||[])add(x.content,x.role==='assistant'?'a':'u');if(!(j.history||[]).length)add('Hola, '+me.display_name+'. Estoy aquí. Puedes hablarme, escribir o usar los accesos rápidos.','a')}
 async function boot(){
   try{
+    if('serviceWorker' in navigator){
+      try{
+        const reg=await navigator.serviceWorker.register('/sw.js?v=3.7',{updateViaCache:'none'});
+        await reg.update();
+      }catch{}
+    }
     me=await profile();
     if(!me){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}
     if(!me.active){$('msg').innerHTML='<span class="err">Tu cuenta está pendiente de activación por Dirección.</span>';await sb.auth.signOut();return}
     $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     const sessionKey='ferval_'+APP_VERSION+'_'+me.user_id;
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
-    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia','tileControlDiario'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);$('homePendingCard').classList.toggle('hidden',!n1);$('homeAuditCard').classList.toggle('hidden',!n1);$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
+    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia','tileControlDiario'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);$('homePendingCard').classList.toggle('hidden',!n1);$('homeAuditCard').classList.toggle('hidden',!n1);if(!n1){$('homePendingCard').style.display='none';$('homeAuditCard').style.display='none'}else{$('homePendingCard').style.display='';$('homeAuditCard').style.display=''}$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
     await loadNotifications();
     if(n1){await loadDirectionAlerts();await loadUsers();await loadAudit()}else{await setupPushUI();await loadDirectionWork();await pollDirectionNotifications()}
     await loadHistory();showView('homeView');
