@@ -8,10 +8,11 @@ self.addEventListener('push',event=>{
     body:data.body,
     icon:'/icon-192.png?v=2.2',
     badge:'/icon-192.png?v=2.2',
-    tag:data.tag||'ferval-direction',
+    tag:data.tag||('ferval-direction-'+Date.now()),
     renotify:true,
     requireInteraction:data.priority==='urgent',
-    vibrate:data.priority==='urgent'?[250,120,250,120,350]:[180],
+    silent:false,
+    vibrate:data.priority==='urgent'?[300,120,300,120,500]:[180],
     data:{url:data.url||'/'}
   }));
 });
