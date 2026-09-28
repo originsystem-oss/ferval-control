@@ -1,3 +1,6 @@
+const SW_VERSION='3.7';
+self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('push',event=>{
   let data={title:'FERVAL CONTROL',body:'Tienes un aviso de Dirección.',url:'/'};
   try{data={...data,...event.data.json()}}catch{}
