@@ -111,3 +111,32 @@ Cada cambio estructural deberá registrar:
 - N3 hilo visible: 1;
 - N3 mensajes visibles en el hilo: 2.
 La prueba se ejecutó dentro de una transacción y se revirtió.
+
+
+---
+
+## 2026-09-28 — Piloto N2 real en Android y notificaciones push
+**Usuario de ensayo:** Jesús · N2.
+
+**Pruebas realizadas:**
+- alta separada de N1;
+- restricciones económicas;
+- conversación con Yayo;
+- Direction Guard;
+- bloqueo temporal y escalado;
+- supervisión N1;
+- activación de notificaciones PWA;
+- recepción push con FERVAL CONTROL cerrada.
+
+**Resultado push:** recepción confirmada en Android con la PWA cerrada. El sonido audible depende del canal/configuración de notificaciones del sistema Android; la PWA solicita persistencia y vibración, pero no debe asumir control absoluto del sonido.
+
+**Correcciones derivadas del ensayo:**
+- las restricciones internas se aplican en silencio;
+- ayuda N2/N3 deja de enumerar información reservada;
+- paneles N1 ocultos por defecto desde HTML;
+- ruta limpia /app para instalación PWA;
+- Control Diario reservado N1 + Yayo;
+- acceso N1 directo para aviso urgente;
+- notificaciones push registradas por usuario/dispositivo.
+
+**Estado:** piloto N2 funcional para continuar pruebas. Pendiente ampliar circuito con N3 de ensayo y terminar automatización de preguntas/respuestas del Control Diario.
