@@ -1,4 +1,4 @@
-const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/main/public/ferval-control-1.3.html';
+const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/83e07c28b1b081b5db9a3f6e4013484341002d52/public/ferval-control-1.3.html';
 const html=await (await fetch(HTML_URL,{headers:{'cache-control':'no-cache'}})).text();
 const port=Number(process.env.PORT||3000);
 
