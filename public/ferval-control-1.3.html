@@ -56,6 +56,7 @@
       <button id="tileSupervision" class="tile"><div class="tileIcon">🔗</div><strong id="supervisionTileTitle">Operativa</strong><span id="supervisionTileSub">N2 · N3 · Dirección</span></button>
       <button id="tileConversaciones" class="tile"><div class="tileIcon">🗂️</div><strong>Historial</strong><span>Tus conversaciones</span></button>
       <button id="tileHistorial" class="tile n1only"><div class="tileIcon">🕘</div><strong>Historial</strong><span>Trazabilidad Dirección</span></button>
+      <button id="tileChatsUsuarios" class="tile n1only"><div class="tileIcon">👁️</div><strong>Chats usuarios</strong><span>Supervisión N1</span></button>
       <button id="tileAccesos" class="tile"><div class="tileIcon">⚡</div><strong>Accesos</strong><span>Parte · Escalar · Recuerda</span></button>
       <button id="tileEstado" class="tile n1only"><div class="tileIcon">🛡️</div><strong>Estado</strong><span>Sistema y seguridad</span></button>
       <button id="tileAyuda" class="tile"><div class="tileIcon">❓</div><strong>Ayuda</strong><span>Cómo usar FERVAL CONTROL</span></button>
@@ -66,6 +67,7 @@
 
   <main id="chatView" class="view chatView hidden">
     <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Conversación con Yayo</h2><button id="newChat" class="mini alt">Nueva</button></div>
+    <div id="workChatNotice" class="muted hidden" style="margin-bottom:10px">Conversación de trabajo con Yayo. Dirección N1 puede auditar este contenido.</div>
     <div id="quick" class="quick">
       <button id="qParte" class="mini">Parte</button>
       <button id="qEscalar" class="mini alt">Escalar</button>
@@ -131,6 +133,20 @@
   <main id="obrasView" class="view hidden">
     <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Obras</h2><span></span></div>
     <section class="sectionCard"><div id="obrasList" class="muted">Cargando…</div></section>
+  </main>
+
+  <main id="userChatsView" class="view hidden">
+    <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Chats de trabajo</h2><span></span></div>
+    <section class="sectionCard">
+      <div class="muted">Supervisión N1 de conversaciones de trabajo con Yayo. Modo lectura.</div>
+      <select id="chatUserSelect" class="field"></select>
+      <button id="loadUserChatsBtn" class="btn primary full">Ver conversaciones</button>
+      <div id="userChatSessions" style="margin-top:12px"></div>
+    </section>
+    <section id="userChatDetail" class="sectionCard hidden">
+      <h3 id="userChatTitle">Conversación</h3>
+      <div id="userChatMessages"></div>
+    </section>
   </main>
 
   <main id="historialView" class="view hidden">
@@ -229,7 +245,7 @@ const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
 const APP_VERSION='2.9';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
-const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','obrasView','historialView','estadoView','ayudaView'];
+const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','obrasView','userChatsView','historialView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
 function add(t,k){const d=document.createElement('div');d.className='m '+k;d.textContent=t;$('chat').appendChild(d);$('chat').scrollTop=$('chat').scrollHeight}
 async function profile(){const {data:{user}}=await sb.auth.getUser();if(!user)return null;const {data:p,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').eq('user_id',user.id).maybeSingle();if(error)throw error;return p}
@@ -325,6 +341,30 @@ async function replySupervisorThread(){
   const {data:threads}=await sb.from('yayo_supervisor_threads').select('id,manager_user_id,worker_user_id,title,status,created_at,updated_at').eq('id',threadId);
   if(threads?.length)await openSupervisorThread(threadId,threads,new Map());
 }
+
+async function loadN1UserChats(){
+  if(me?.access_level!=='N1')return;
+  const {data:users,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').neq('access_level','N1').order('display_name');
+  if(error){$('userChatSessions').innerHTML='<div class="err">'+esc(error.message)+'</div>';return}
+  $('chatUserSelect').innerHTML=(users||[]).map(u=>'<option value="'+esc(u.user_id)+'">'+esc(u.display_name)+' · '+esc(u.access_level)+'</option>').join('')||'<option value="">Sin usuarios N2/N3</option>';
+  $('userChatSessions').innerHTML='<div class="muted">Selecciona un usuario para revisar sus conversaciones.</div>';
+  $('userChatDetail').classList.add('hidden');
+}
+async function loadSelectedUserChats(){
+  if(me?.access_level!=='N1')return;
+  const uid=$('chatUserSelect').value;if(!uid)return;
+  const {data,error}=await sb.from('yayo_sessions').select('session_key,title,updated_at,created_at,archived').eq('user_id',uid).order('updated_at',{ascending:false}).limit(100);
+  if(error){$('userChatSessions').innerHTML='<div class="err">'+esc(error.message)+'</div>';return}
+  $('userChatSessions').innerHTML=(data||[]).map(s=>'<div class="userrow"><b>'+esc(s.title||'Conversación')+'</b><div class="muted">'+new Date(s.updated_at||s.created_at).toLocaleString()+'</div><div class="rowActions"><button class="mini" data-read-user-chat="'+esc(s.session_key)+'">Abrir</button></div></div>').join('')||'<div class="muted">Este usuario todavía no tiene conversaciones.</div>';
+  document.querySelectorAll('[data-read-user-chat]').forEach(b=>b.onclick=()=>openN1UserChat(b.dataset.readUserChat));
+}
+async function openN1UserChat(sessionKey){
+  if(me?.access_level!=='N1')return;
+  const {data,error}=await sb.from('yayo_session_messages').select('role,body,created_at').eq('session_key',sessionKey).order('id');
+  if(error){$('userChatMessages').innerHTML='<div class="err">'+esc(error.message)+'</div>';return}
+  $('userChatMessages').innerHTML=(data||[]).map(m=>'<div class="userrow"><b>'+(m.role==='assistant'?'Yayo':'Usuario')+'</b><div>'+esc(m.body)+'</div><div class="muted">'+new Date(m.created_at).toLocaleString()+'</div></div>').join('')||'<div class="muted">Sin mensajes.</div>';
+  $('userChatDetail').classList.remove('hidden');
+}
 async function loadUsers(){
   if(me?.access_level!=='N1'){return}
   const {data,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').order('display_name');
@@ -416,7 +456,7 @@ async function boot(){
     $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     const sessionKey='ferval_'+APP_VERSION+'_'+me.user_id;
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
-    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
+    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
     if(n1){await loadUsers();await loadAudit()} await loadHistory();showView('homeView');
   }catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}
 }
@@ -441,6 +481,8 @@ $('threadReplyBtn').onclick=replySupervisorThread;
 $('tileEquipo').onclick=async()=>{await loadUsers();showView('equipoView')};
 $('tileObras').onclick=async()=>{await loadObras();showView('obrasView')};
 $('tileHistorial').onclick=async()=>{await loadAudit();showView('historialView')};
+$('tileChatsUsuarios').onclick=async()=>{await loadN1UserChats();showView('userChatsView')};
+$('loadUserChatsBtn').onclick=loadSelectedUserChats;
 $('tileEstado').onclick=async()=>{await loadSystemStatus();showView('estadoView')};
 $('tileAccesos').onclick=()=>showView('chatView');
 $('tileAyuda').onclick=()=>showView('ayudaView');
