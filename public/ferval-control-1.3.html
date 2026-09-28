@@ -59,6 +59,7 @@
       <button id="tileChatsUsuarios" class="tile n1only"><div class="tileIcon">👁️</div><strong>Chats usuarios</strong><span>Supervisión N1</span></button>
       <button id="tileAccesos" class="tile"><div class="tileIcon">⚡</div><strong>Accesos</strong><span>Parte · Escalar · Recuerda</span></button>
       <button id="tileEstado" class="tile n1only"><div class="tileIcon">🛡️</div><strong>Estado</strong><span>Sistema y seguridad</span></button>
+      <button id="tileGuardia" class="tile n1only"><div class="tileIcon">🚨</div><strong>Guardia Dirección</strong><span>Incidencias y bloqueos</span></button>
       <button id="tileAyuda" class="tile"><div class="tileIcon">❓</div><strong>Ayuda</strong><span>Cómo usar FERVAL CONTROL</span></button>
     </div>
     <section class="sectionCard"><h3>Usuarios pendientes</h3><div id="homePending" class="muted">Cargando…</div></section>
@@ -154,6 +155,14 @@
     <section class="sectionCard"><div id="audit"></div></section>
   </main>
 
+  <main id="guardiaView" class="view hidden">
+    <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Guardia Dirección</h2><span></span></div>
+    <section class="sectionCard">
+      <div class="muted">Sólo N1. Incidencias detectadas por Direction Guard y bloqueos temporales.</div>
+      <div id="guardEvents" style="margin-top:12px"></div>
+    </section>
+  </main>
+
   <main id="estadoView" class="view hidden">
     <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Estado del sistema</h2><span></span></div>
     <section class="sectionCard"><div id="systemStatus" class="muted">Comprobando…</div></section>
@@ -243,9 +252,9 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='2.9';
+const APP_VERSION='3.1';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
-const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','obrasView','userChatsView','historialView','estadoView','ayudaView'];
+const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
 function add(t,k){const d=document.createElement('div');d.className='m '+k;d.textContent=t;$('chat').appendChild(d);$('chat').scrollTop=$('chat').scrollHeight}
 async function profile(){const {data:{user}}=await sb.auth.getUser();if(!user)return null;const {data:p,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').eq('user_id',user.id).maybeSingle();if(error)throw error;return p}
@@ -365,6 +374,41 @@ async function openN1UserChat(sessionKey){
   $('userChatMessages').innerHTML=(data||[]).map(m=>'<div class="userrow"><b>'+(m.role==='assistant'?'Yayo':'Usuario')+'</b><div>'+esc(m.body)+'</div><div class="muted">'+new Date(m.created_at).toLocaleString()+'</div></div>').join('')||'<div class="muted">Sin mensajes.</div>';
   $('userChatDetail').classList.remove('hidden');
 }
+
+async function loadGuardia(){
+  if(me?.access_level!=='N1')return;
+  const [ev,bl,pr]=await Promise.all([
+    sb.from('yayo_guard_events').select('id,user_id,session_key,severity,category,reason,message_excerpt,action_taken,created_at,status').order('created_at',{ascending:false}).limit(100),
+    sb.from('yayo_session_blocks').select('id,user_id,session_key,reason,active,blocked_at,expires_at').eq('active',true).order('blocked_at',{ascending:false}),
+    sb.from('app_profiles').select('user_id,display_name,access_level')
+  ]);
+  if(ev.error){$('guardEvents').innerHTML='<div class="err">'+esc(ev.error.message)+'</div>';return}
+  const names=new Map((pr.data||[]).map(x=>[x.user_id,x]));
+  const activeBlocks=new Map((bl.data||[]).map(x=>[(x.user_id||'')+'|'+(x.session_key||''),x]));
+  $('guardEvents').innerHTML=(ev.data||[]).map(e=>{
+    const u=names.get(e.user_id);
+    const key=(e.user_id||'')+'|'+(e.session_key||'');
+    const b=activeBlocks.get(key);
+    return '<div class="userrow">'+
+      '<b>'+esc(u?.display_name||e.user_id)+' · '+esc(e.severity.toUpperCase())+'</b>'+
+      '<div class="muted">'+new Date(e.created_at).toLocaleString()+' · '+esc(e.category)+' · '+esc(e.status)+'</div>'+
+      '<div style="margin-top:7px">'+esc(e.reason)+'</div>'+
+      (e.message_excerpt?'<div class="muted" style="margin-top:7px">Mensaje: '+esc(e.message_excerpt)+'</div>':'')+
+      '<div class="muted" style="margin-top:6px">Acción: '+esc(e.action_taken)+'</div>'+
+      '<div class="rowActions">'+
+      (e.status==='open'?'<button class="mini" data-review-guard="'+e.id+'">Marcar revisada</button>':'')+
+      (b?'<button class="mini alt" data-unblock-guard="'+b.id+'">Desbloquear</button>':'')+
+      '</div></div>';
+  }).join('')||'<div class="muted">No hay incidencias registradas.</div>';
+  document.querySelectorAll('[data-review-guard]').forEach(b=>b.onclick=async()=>{
+    const {error}=await sb.from('yayo_guard_events').update({status:'reviewed',reviewed_at:new Date().toISOString(),reviewed_by:me.user_id}).eq('id',Number(b.dataset.reviewGuard));
+    if(error)alert(error.message);else loadGuardia();
+  });
+  document.querySelectorAll('[data-unblock-guard]').forEach(b=>b.onclick=async()=>{
+    const {error}=await sb.from('yayo_session_blocks').update({active:false}).eq('id',Number(b.dataset.unblockGuard));
+    if(error)alert(error.message);else loadGuardia();
+  });
+}
 async function loadUsers(){
   if(me?.access_level!=='N1'){return}
   const {data,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').order('display_name');
@@ -456,7 +500,7 @@ async function boot(){
     $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     const sessionKey='ferval_'+APP_VERSION+'_'+me.user_id;
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
-    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
+    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
     if(n1){await loadUsers();await loadAudit()} await loadHistory();showView('homeView');
   }catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}
 }
@@ -484,6 +528,7 @@ $('tileHistorial').onclick=async()=>{await loadAudit();showView('historialView')
 $('tileChatsUsuarios').onclick=async()=>{await loadN1UserChats();showView('userChatsView')};
 $('loadUserChatsBtn').onclick=loadSelectedUserChats;
 $('tileEstado').onclick=async()=>{await loadSystemStatus();showView('estadoView')};
+$('tileGuardia').onclick=async()=>{await loadGuardia();showView('guardiaView')};
 $('tileAccesos').onclick=()=>showView('chatView');
 $('tileAyuda').onclick=()=>showView('ayudaView');
 $('qParte').onclick=()=>{$('input').value='PARTE: ';$('input').focus()}
