@@ -136,3 +136,18 @@ Ante una infracción grave:
 5. informa al usuario de que la incidencia se ha enviado a Dirección.
 
 Las discrepancias profesionales, quejas de buena fe y crítica legítima no deben clasificarse automáticamente como infracción.
+
+
+---
+
+## ADR-010 — Revisión humana de incidentes del Direction Guard
+**Estado:** aceptada.
+
+Los bloqueos automáticos del guardián son temporales y auditables.
+N1 dispone de una bandeja exclusiva para:
+- revisar el incidente;
+- consultar el motivo y contexto registrado;
+- marcar la incidencia como revisada;
+- retirar el bloqueo cuando proceda.
+
+N2/N3 no tienen acceso al panel ni a las reglas internas que provocaron la detección.
