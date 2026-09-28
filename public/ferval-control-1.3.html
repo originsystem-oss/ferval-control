@@ -579,7 +579,20 @@ async function sendControlQuestion(){
   const target=$('questionTarget').value,obra=$('questionObra').value,text=$('questionText').value.trim(),priority=$('questionPriority').value;
   if(!target||!obra||!text)return alert('Selecciona usuario, obra y escribe la pregunta.');
   const {error}=await sb.from('fer_direction_questions').insert({obra_id:obra,target_user_id:target,question:text,priority,status:'pending',validation_status:'unvalidated',created_by:me.user_id});
-  if(error)alert(error.message);else{$('questionText').value='';alert('Pregunta enviada.');loadControlDiario()}
+  if(error){alert(error.message);return}
+  if(priority==='urgent'||priority==='important'){
+    try{
+      const {data:{session}}=await sb.auth.getSession();
+      await fetch('/api/push/dispatch',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({
+        target_user_id:target,
+        title:priority==='urgent'?'URGENTE · Dirección':'Dirección · Importante',
+        body:text,
+        priority,
+        url:'/'
+      })});
+    }catch{}
+  }
+  $('questionText').value='';alert('Pregunta enviada.');loadControlDiario()
 }
 async function loadDirectionWork(){
   if(!me||me.access_level==='N1')return;
