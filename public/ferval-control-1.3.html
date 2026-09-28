@@ -69,6 +69,7 @@
       <button id="qParte" class="mini">Parte</button>
       <button id="qEscalar" class="mini alt">Escalar</button>
       <button id="qRecuerda" class="mini alt">Recuerda</button>
+      <button id="qAprende" class="mini alt">Aprende</button>
     </div>
     <div id="chat" class="chat"></div>
     <div class="composer">
@@ -220,7 +221,7 @@ async function boot(){
     $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     const sessionKey='ferval_'+APP_VERSION+'_'+me.user_id;
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
-    const n1=me.access_level==='N1';['tileObras','tileEquipo','tileHistorial','tileEstado'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';
+    const n1=me.access_level==='N1';['tileObras','tileEquipo','tileHistorial','tileEstado'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';
     if(n1){await loadUsers();await loadAudit()} await loadHistory();showView('homeView');
   }catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}
 }
@@ -241,6 +242,7 @@ $('tileAyuda').onclick=()=>showView('ayudaView');
 $('qParte').onclick=()=>{$('input').value='PARTE: ';$('input').focus()}
 $('qEscalar').onclick=()=>{$('input').value='ESCALAR: ';$('input').focus()}
 $('qRecuerda').onclick=()=>{$('input').value='RECUERDA: ';$('input').focus()}
+$('qAprende').onclick=()=>{$('input').value='APRENDE: ';$('input').focus()}
 $('newChat').onclick=createNewConversation;
 $('newChatFromHistory').onclick=async()=>{await createNewConversation();showView('chatView')}
 let mediaRecorder=null,audioChunks=[],recording=false,stream=null;
@@ -287,7 +289,36 @@ $('mic').onclick=async()=>{
   }
   await startRecording();
 }
-$('form').onsubmit=async e=>{e.preventDefault();const t=$('input').value.trim();if(!t)return;$('input').value='';add(t,'u');$('status').textContent='Yayo está pensando…';try{const {data:{session}}=await sb.auth.getSession();const r=await fetch(FN+'/chat',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({message:t,sid})});const j=await r.json();add(j.reply||j.error||'No he podido responder.','a')}catch{add('No he podido conectar.','a')}finally{$('status').textContent=''}}
+$('form').onsubmit=async e=>{
+  e.preventDefault();
+  const t=$('input').value.trim();
+  if(!t)return;
+  $('input').value='';
+  add(t,'u');
+  $('status').textContent='Yayo está pensando…';
+  try{
+    const learn=t.match(/^(?:APRENDE|REGLA DE DIRECCIÓN):\s*(.+)$/i);
+    if(learn&&me?.access_level==='N1'){
+      const {error}=await sb.from('direction_memory').insert({
+        memory_key:'direction_rule_'+Date.now(),
+        content:learn[1].trim(),
+        source:'explicit_direction',
+        status:'validated',
+        validated_by:me.display_name,
+        validated_at:new Date().toISOString(),
+        source_session:sid,
+        metadata:{kind:'direction_learning',via:'n1_ui'}
+      });
+      if(error)throw new Error('No se pudo guardar el aprendizaje: '+error.message);
+    }
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(FN+'/chat',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({message:t,sid})});
+    const j=await r.json();
+    add(j.reply||j.error||'No he podido responder.','a');
+  }catch(e){
+    add(e?.message||'No he podido conectar.','a');
+  }finally{$('status').textContent=''}
+}
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session)await boot()})();
 </script>
 </body>
