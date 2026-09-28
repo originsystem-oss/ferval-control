@@ -34,7 +34,7 @@
     <input id="name" class="field hidden" placeholder="Nombre y apellidos">
     <input id="email" class="field" type="email" placeholder="Correo">
     <input id="pass" class="field" type="password" placeholder="Contraseña">
-    <button id="go" class="btn primary full">Entrar</button>
+    <button id="go" type="button" class="btn primary full" onclick="window.__fervalLogin&&window.__fervalLogin()">Entrar</button>
     <button id="mode" class="btn secondary full">Crear cuenta</button>
     <div id="msg"></div>
   </div>
@@ -289,7 +289,7 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='4.4';
+const APP_VERSION='4.5';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
 const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','avisoUrgenteView','controlDiarioView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
@@ -807,8 +807,35 @@ async function boot(){
     await loadHistory();showView('homeView');
   }catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}
 }
+window.__fervalLogin=async function(){
+  const btn=document.getElementById('go'),msg=document.getElementById('msg');
+  if(!btn||!msg)return;
+  msg.textContent='';
+  btn.disabled=true;btn.textContent=signup?'Registrando…':'Entrando…';
+  try{
+    if(signup){
+      const name=$('name').value.trim(),email=$('email').value.trim(),password=$('pass').value;
+      if(!name||!email||password.length<8)throw new Error('Completa nombre, correo y una contraseña de 8 caracteres o más.');
+      const {error}=await sb.auth.signUp({email,password,options:{data:{display_name:name}}});
+      if(error)throw error;
+      msg.innerHTML='<span class="ok">Cuenta creada. Dirección debe activarla antes de entrar.</span>';
+      return;
+    }
+    try{const s=await sb.auth.getSession();if(s?.error)await sb.auth.signOut({scope:'local'})}catch{}
+    const email=$('email').value.trim(),password=$('pass').value;
+    if(!email||!password)throw new Error('Introduce correo y contraseña.');
+    const {error}=await sb.auth.signInWithPassword({email,password});
+    if(error)throw error;
+    msg.innerHTML='<span class="ok">Acceso correcto. Cargando…</span>';
+    await boot();
+  }catch(e){
+    msg.innerHTML='<span class="err">'+esc(String(e?.message||e))+'</span>';
+  }finally{
+    btn.disabled=false;btn.textContent=signup?'Registrar':'Entrar';
+  }
+};
 $('mode').onclick=()=>{signup=!signup;$('name').classList.toggle('hidden',!signup);$('go').textContent=signup?'Registrar':'Entrar';$('mode').textContent=signup?'Ya tengo cuenta':'Crear cuenta';$('msg').textContent=''}
-$('go').onclick=async()=>{$('msg').textContent='';if(signup){const name=$('name').value.trim(),email=$('email').value.trim(),password=$('pass').value;if(!name||!email||password.length<8){$('msg').innerHTML='<span class="err">Completa nombre, correo y una contraseña de 8 caracteres o más.</span>';return}const {error}=await sb.auth.signUp({email,password,options:{data:{display_name:name}}});if(error){$('msg').innerHTML='<span class="err">'+error.message+'</span>';return}$('msg').innerHTML='<span class="ok">Cuenta creada. Dirección debe activarla antes de entrar.</span>';return}const {error}=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('pass').value});if(error){$('msg').innerHTML='<span class="err">'+error.message+'</span>';return}await boot()}
+// Login uses resilient direct handler window.__fervalLogin.
 $('out').onclick=async()=>{await sb.auth.signOut();location.reload()}
 document.querySelectorAll('[data-home]').forEach(b=>b.onclick=()=>showView('homeView'));
 $('heroChat').onclick=$('tileChat').onclick=$('tabChat').onclick=()=>showView('chatView');
