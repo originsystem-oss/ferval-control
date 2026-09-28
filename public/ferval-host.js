@@ -1,4 +1,4 @@
-const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/268a04baadb542251c0d3be19967af5c1b489322/public/ferval-control-1.3.html';
+const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/04eebfed8a792253ed15b087c8c39a0a87b558a7/public/ferval-control-1.3.html';
 const SW_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/7e4d7f958e7819aa7e1d702665f694cdb4be831c/public/sw.js';
 const [html,sw]=await Promise.all([
   fetch(HTML_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
@@ -137,7 +137,7 @@ Bun.serve({
       }
     }
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'4.2-n2-pilot-closure'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'4.3-full-hierarchy-circuit'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -169,12 +169,12 @@ Bun.serve({
       }
     }
     if(u.pathname==='/app'||u.pathname==='/app/'){
-      return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','pragma':'no-cache','expires':'0','x-ferval-version':'4.2'}});
+      return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','pragma':'no-cache','expires':'0','x-ferval-version':'4.3'}});
     }
     if(u.pathname==='/'){
-      return Response.redirect(new URL('/app?v=4.2',u.origin),302);
+      return Response.redirect(new URL('/app?v=4.3',u.origin),302);
     }
-    return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','x-ferval-version':'4.2'}});
+    return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','x-ferval-version':'4.3'}});
   }
 });
-console.log('FERVAL CONTROL 4.2 N2 pilot closure host on',port);
+console.log('FERVAL CONTROL 4.3 hierarchy circuit host on',port);
