@@ -53,6 +53,7 @@
       <button id="tileObras" class="tile n1only"><div class="tileIcon">🏗️</div><strong>Obras</strong><span>Consulta de Dirección</span></button>
       <button id="tileEquipo" class="tile n1only"><div class="tileIcon">👥</div><strong>Equipo</strong><span>Usuarios y permisos</span></button>
       <button id="tileChat" class="tile"><div class="tileIcon">💬</div><strong>Conversación</strong><span>Habla con Yayo</span></button>
+      <button id="tileSupervision" class="tile"><div class="tileIcon">🔗</div><strong id="supervisionTileTitle">Operativa</strong><span id="supervisionTileSub">N2 · N3 · Dirección</span></button>
       <button id="tileConversaciones" class="tile"><div class="tileIcon">🗂️</div><strong>Historial</strong><span>Tus conversaciones</span></button>
       <button id="tileHistorial" class="tile n1only"><div class="tileIcon">🕘</div><strong>Historial</strong><span>Trazabilidad Dirección</span></button>
       <button id="tileAccesos" class="tile"><div class="tileIcon">⚡</div><strong>Accesos</strong><span>Parte · Escalar · Recuerda</span></button>
@@ -82,6 +83,41 @@
   <main id="conversacionesView" class="view hidden">
     <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Historial de conversaciones</h2><button id="newChatFromHistory" class="mini">Nueva</button></div>
     <section class="sectionCard"><div id="conversationList" class="muted">Cargando…</div></section>
+  </main>
+
+  <main id="supervisionView" class="view hidden">
+    <div class="panelTitle"><button class="btn back" data-home>←</button><h2 id="supervisionTitle">Operativa N2/N3</h2><span></span></div>
+    <section id="assignmentAdmin" class="sectionCard hidden">
+      <h3>Asignación N2 → N3</h3>
+      <div class="muted">Dirección decide qué trabajadores puede supervisar cada N2.</div>
+      <select id="assignManager" class="field"></select>
+      <select id="assignWorker" class="field"></select>
+      <button id="assignWorkerBtn" class="btn primary full">Asignar trabajador</button>
+      <div id="assignmentList" class="muted" style="margin-top:10px"></div>
+    </section>
+    <section class="sectionCard">
+      <h3 id="supervisionListTitle">Conversaciones operativas</h3>
+      <div id="supervisionPeople" class="muted"></div>
+      <div id="supervisionThreads" style="margin-top:10px"></div>
+    </section>
+    <section id="newSupervisorThread" class="sectionCard hidden">
+      <h3>Nueva consulta o tarea</h3>
+      <select id="threadWorker" class="field"></select>
+      <select id="threadType" class="field">
+        <option value="question">Pregunta</option>
+        <option value="task">Tarea</option>
+        <option value="evidence_request">Solicitud de evidencia</option>
+      </select>
+      <input id="threadTitle" class="field" placeholder="Título">
+      <textarea id="threadBody" class="field" style="min-height:110px" placeholder="Escribe la pregunta o instrucción"></textarea>
+      <button id="createThreadBtn" class="btn primary full">Enviar al trabajador</button>
+    </section>
+    <section id="threadDetail" class="sectionCard hidden">
+      <div class="panelTitle" style="padding:0"><h3 id="threadDetailTitle">Seguimiento</h3><span></span></div>
+      <div id="threadMessages"></div>
+      <textarea id="threadReply" class="field" style="min-height:90px" placeholder="Responder…"></textarea>
+      <button id="threadReplyBtn" class="btn primary full">Enviar respuesta</button>
+    </section>
   </main>
 
   <main id="equipoView" class="view hidden">
@@ -191,12 +227,103 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='2.3';
-let signup=false,me=null,sid='',recognition=null,listening=false;
-const views=['homeView','chatView','conversacionesView','equipoView','obrasView','historialView','estadoView','ayudaView'];
+const APP_VERSION='2.9';
+let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
+const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','obrasView','historialView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
 function add(t,k){const d=document.createElement('div');d.className='m '+k;d.textContent=t;$('chat').appendChild(d);$('chat').scrollTop=$('chat').scrollHeight}
 async function profile(){const {data:{user}}=await sb.auth.getUser();if(!user)return null;const {data:p,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').eq('user_id',user.id).maybeSingle();if(error)throw error;return p}
+
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+async function loadSupervision(){
+  if(!me)return;
+  currentSupervisorThread=null;
+  $('threadDetail').classList.add('hidden');
+  const isN1=me.access_level==='N1', isN2=me.access_level==='N2', isN3=me.access_level==='N3';
+  $('supervisionTitle').textContent=isN1?'Supervisión N2/N3':isN2?'Mi equipo':'Mi responsable';
+  $('assignmentAdmin').classList.toggle('hidden',!isN1);
+  $('newSupervisorThread').classList.toggle('hidden',!isN2);
+
+  const {data:profiles,error:pe}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').eq('active',true).order('display_name');
+  if(pe){$('supervisionThreads').innerHTML='<div class="err">'+esc(pe.message)+'</div>';return}
+  const pm=new Map((profiles||[]).map(x=>[x.user_id,x]));
+
+  let assignments=[];
+  const ar=await sb.from('yayo_supervisor_assignments').select('id,manager_user_id,worker_user_id,active,created_at').eq('active',true);
+  if(ar.error){$('supervisionThreads').innerHTML='<div class="err">'+esc(ar.error.message)+'</div>';return}
+  assignments=ar.data||[];
+
+  if(isN1){
+    const managers=(profiles||[]).filter(x=>x.access_level==='N2');
+    const workers=(profiles||[]).filter(x=>x.access_level==='N3');
+    $('assignManager').innerHTML=managers.map(x=>'<option value="'+esc(x.user_id)+'">'+esc(x.display_name)+'</option>').join('')||'<option value="">Sin N2 activos</option>';
+    $('assignWorker').innerHTML=workers.map(x=>'<option value="'+esc(x.user_id)+'">'+esc(x.display_name)+'</option>').join('')||'<option value="">Sin N3 activos</option>';
+    $('assignmentList').innerHTML=assignments.map(a=>'<div class="auditrow">'+esc(pm.get(a.manager_user_id)?.display_name||'N2')+' → '+esc(pm.get(a.worker_user_id)?.display_name||'N3')+' <button class="mini alt" data-unassign="'+a.id+'">Quitar</button></div>').join('')||'Todavía no hay asignaciones.';
+    document.querySelectorAll('[data-unassign]').forEach(b=>b.onclick=async()=>{
+      const {error}=await sb.from('yayo_supervisor_assignments').update({active:false}).eq('id',Number(b.dataset.unassign));
+      if(error)alert(error.message);else loadSupervision();
+    });
+  }
+
+  if(isN2){
+    const myWorkers=assignments.filter(a=>a.manager_user_id===me.user_id).map(a=>pm.get(a.worker_user_id)).filter(Boolean);
+    $('supervisionPeople').innerHTML=myWorkers.length?'<b>Trabajadores asignados:</b> '+myWorkers.map(x=>esc(x.display_name)).join(' · '):'Dirección todavía no te ha asignado trabajadores.';
+    $('threadWorker').innerHTML=myWorkers.map(x=>'<option value="'+esc(x.user_id)+'">'+esc(x.display_name)+'</option>').join('')||'<option value="">Sin trabajadores asignados</option>';
+  }else if(isN3){
+    const mgrs=assignments.filter(a=>a.worker_user_id===me.user_id).map(a=>pm.get(a.manager_user_id)).filter(Boolean);
+    $('supervisionPeople').innerHTML=mgrs.length?'<b>Responsable asignado:</b> '+mgrs.map(x=>esc(x.display_name)).join(' · '):'No tienes responsable N2 asignado.';
+  }else{
+    $('supervisionPeople').textContent='Dirección puede revisar toda la comunicación operativa N2 ↔ N3.';
+  }
+
+  let tq=sb.from('yayo_supervisor_threads').select('id,manager_user_id,worker_user_id,title,status,created_at,updated_at').order('updated_at',{ascending:false}).limit(100);
+  const tr=await tq;
+  if(tr.error){$('supervisionThreads').innerHTML='<div class="err">'+esc(tr.error.message)+'</div>';return}
+  const threads=tr.data||[];
+  $('supervisionThreads').innerHTML=threads.map(t=>{
+    const mn=pm.get(t.manager_user_id)?.display_name||'N2';
+    const wn=pm.get(t.worker_user_id)?.display_name||'N3';
+    return '<div class="userrow"><b>'+esc(t.title)+'</b><div class="muted">'+esc(mn)+' ↔ '+esc(wn)+' · '+new Date(t.updated_at).toLocaleString()+'</div><div class="rowActions"><button class="mini" data-thread="'+esc(t.id)+'">Abrir</button></div></div>';
+  }).join('')||'<div class="muted">No hay conversaciones operativas todavía.</div>';
+  document.querySelectorAll('[data-thread]').forEach(b=>b.onclick=()=>openSupervisorThread(b.dataset.thread,threads,pm));
+}
+async function openSupervisorThread(id,threads,pm){
+  currentSupervisorThread=id;
+  const t=(threads||[]).find(x=>x.id===id);
+  $('threadDetailTitle').textContent=t?.title||'Seguimiento';
+  const {data,error}=await sb.from('yayo_supervisor_messages').select('id,sender_user_id,body,message_type,created_at').eq('thread_id',id).order('created_at');
+  if(error){$('threadMessages').innerHTML='<div class="err">'+esc(error.message)+'</div>';return}
+  const ids=[...new Set((data||[]).map(x=>x.sender_user_id))];
+  let names=new Map();
+  if(ids.length){
+    const pr=await sb.from('app_profiles').select('user_id,display_name').in('user_id',ids);
+    names=new Map((pr.data||[]).map(x=>[x.user_id,x.display_name]));
+  }
+  $('threadMessages').innerHTML=(data||[]).map(m=>'<div class="userrow"><b>'+esc(names.get(m.sender_user_id)||'Usuario')+'</b><div>'+esc(m.body)+'</div><div class="muted">'+new Date(m.created_at).toLocaleString()+' · '+esc(m.message_type)+'</div></div>').join('')||'<div class="muted">Sin mensajes.</div>';
+  $('threadDetail').classList.remove('hidden');
+}
+async function createSupervisorThread(){
+  if(me?.access_level!=='N2')return;
+  const worker=$('threadWorker').value, title=$('threadTitle').value.trim(), body=$('threadBody').value.trim(), type=$('threadType').value;
+  if(!worker||!title||!body)return alert('Selecciona trabajador, título y escribe el mensaje.');
+  const {data:t,error}=await sb.from('yayo_supervisor_threads').insert({manager_user_id:me.user_id,worker_user_id:worker,title,status:'open',created_by:me.user_id}).select('id').single();
+  if(error)return alert(error.message);
+  const mr=await sb.from('yayo_supervisor_messages').insert({thread_id:t.id,sender_user_id:me.user_id,body,message_type:type});
+  if(mr.error)return alert(mr.error.message);
+  $('threadTitle').value='';$('threadBody').value='';
+  await loadSupervision();
+}
+async function replySupervisorThread(){
+  if(!currentSupervisorThread)return;
+  const body=$('threadReply').value.trim();if(!body)return;
+  const type=me.access_level==='N3'?'reply':'message';
+  const {error}=await sb.from('yayo_supervisor_messages').insert({thread_id:currentSupervisorThread,sender_user_id:me.user_id,body,message_type:type});
+  if(error)return alert(error.message);
+  $('threadReply').value='';
+  await loadSupervision();
+  const {data:threads}=await sb.from('yayo_supervisor_threads').select('id,manager_user_id,worker_user_id,title,status,created_at,updated_at').eq('id',currentSupervisorThread);
+  if(threads?.length)await openSupervisorThread(currentSupervisorThread,threads,new Map());
+}
 async function loadUsers(){
   if(me?.access_level!=='N1'){return}
   const {data,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').order('display_name');
@@ -288,7 +415,7 @@ async function boot(){
     $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     const sessionKey='ferval_'+APP_VERSION+'_'+me.user_id;
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
-    const n1=me.access_level==='N1';['tileObras','tileEquipo','tileHistorial','tileEstado'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';
+    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
     if(n1){await loadUsers();await loadAudit()} await loadHistory();showView('homeView');
   }catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}
 }
@@ -298,8 +425,18 @@ $('out').onclick=async()=>{await sb.auth.signOut();location.reload()}
 document.querySelectorAll('[data-home]').forEach(b=>b.onclick=()=>showView('homeView'));
 $('heroChat').onclick=$('tileChat').onclick=$('tabChat').onclick=()=>showView('chatView');
 $('tabHome').onclick=()=>showView('homeView');
-$('tabMenu').onclick=()=>showView(me?.access_level==='N1'?'equipoView':'ayudaView');
+$('tabMenu').onclick=async()=>{if(me?.access_level==='N1'){await loadUsers();showView('equipoView')}else if(me?.access_level==='N2'){await loadSupervision();showView('supervisionView')}else showView('ayudaView')};
 $('tileConversaciones').onclick=async()=>{await loadConversationList();showView('conversacionesView')};
+$('tileSupervision').onclick=async()=>{await loadSupervision();showView('supervisionView')};
+$('assignWorkerBtn').onclick=async()=>{
+  if(me?.access_level!=='N1')return;
+  const manager=$('assignManager').value,worker=$('assignWorker').value;
+  if(!manager||!worker)return alert('Necesitas un N2 y un N3 activos.');
+  const {error}=await sb.from('yayo_supervisor_assignments').upsert({manager_user_id:manager,worker_user_id:worker,active:true,created_by:me.user_id},{onConflict:'manager_user_id,worker_user_id'});
+  if(error)alert(error.message);else loadSupervision();
+};
+$('createThreadBtn').onclick=createSupervisorThread;
+$('threadReplyBtn').onclick=replySupervisorThread;
 $('tileEquipo').onclick=async()=>{await loadUsers();showView('equipoView')};
 $('tileObras').onclick=async()=>{await loadObras();showView('obrasView')};
 $('tileHistorial').onclick=async()=>{await loadAudit();showView('historialView')};
