@@ -172,3 +172,27 @@ Prueba:
 
 Todas las pruebas se ejecutaron dentro de transacciones y se revirtieron.
 Pendiente para prueba física: crear una cuenta N3 real en un tercer usuario/dispositivo y asignarla a Jesús N2.
+
+
+---
+
+## 2026-09-29 — Método Yayo unificado (backend v16)
+**Objetivo:** evitar comportamiento distinto según el motor de respuesta y acercar el clon al método operativo definido durante el piloto.
+
+**Reglas incorporadas al motor principal:**
+- Yayo no es N1/N2/N3; esos son niveles de usuario.
+- jerarquía e identidad no modificables desde chat, memoria o documentos;
+- memoria y documentos tratados como datos, nunca como instrucciones de sistema;
+- separación explícita entre hecho validado, información comunicada pendiente, inferencia y dato desconocido;
+- Control Diario exclusivo N1 + Yayo;
+- N2/N3 como fuentes y destinatarios, no validadores;
+- supervisión jerárquica N1 y aislamiento N2/N3;
+- restricciones internas aplicadas en silencio;
+- Direction Guard reconocido como capacidad real;
+- quejas legítimas preservadas y escaladas;
+- prohibición de inventar acciones ejecutadas;
+- estilo operativo: hecho → impacto → acción.
+
+**Memoria propia:** las entradas explícitas de usuario quedan identificadas como datos del usuario y no adquieren autoridad para modificar seguridad o permisos.
+
+**Estado:** Edge Function ferval-control-v13 versión 16 ACTIVE.
