@@ -132,6 +132,28 @@
     </section>
   </main>
 
+  <main id="controlDiarioView" class="view hidden">
+    <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Control Diario</h2><span></span></div>
+    <section class="sectionCard">
+      <div class="muted">Exclusivo Dirección N1 + Yayo. Las respuestas de usuarios quedan pendientes de validación.</div>
+      <input id="controlDate" class="field" type="date">
+      <div id="controlObras" style="margin-top:12px"></div>
+    </section>
+    <section class="sectionCard">
+      <h3>Preguntar desde Dirección</h3>
+      <select id="questionTarget" class="field"></select>
+      <select id="questionObra" class="field"></select>
+      <select id="questionPriority" class="field">
+        <option value="normal">Normal</option>
+        <option value="important">Importante · vibración</option>
+        <option value="urgent">Urgente · sonido + vibración</option>
+      </select>
+      <textarea id="questionText" class="field" style="min-height:100px" placeholder="¿Qué necesita saber Yayo para el Control Diario?"></textarea>
+      <button id="sendDirectionQuestion" class="btn primary full">Enviar pregunta</button>
+    </section>
+    <section class="sectionCard"><h3>Respuestas pendientes de validar</h3><div id="controlAnswers"></div></section>
+  </main>
+
   <main id="obrasView" class="view hidden">
     <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Obras</h2><span></span></div>
     <section class="sectionCard"><div id="obrasList" class="muted">Cargando…</div></section>
@@ -253,9 +275,9 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='3.3';
+const APP_VERSION='3.4';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
-const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
+const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','controlDiarioView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
 function add(t,k){const d=document.createElement('div');d.className='m '+k;d.textContent=t;$('chat').appendChild(d);$('chat').scrollTop=$('chat').scrollHeight}
 async function profile(){const {data:{user}}=await sb.auth.getUser();if(!user)return null;const {data:p,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').eq('user_id',user.id).maybeSingle();if(error)throw error;return p}
@@ -451,7 +473,94 @@ async function loadNotifications(){
   const {data,error}=await sb.from('yayo_user_notifications').select('id,title,body,kind,created_at,read_at').eq('user_id',me.user_id).order('created_at',{ascending:false}).limit(10);
   if(error){$('homeNotifications').textContent='No se pudieron cargar los avisos.';return}
   $('homeNotifications').innerHTML=(data||[]).map(n=>'<div class="auditrow"><b>'+esc(n.title)+'</b><div>'+esc(n.body)+'</div><div class="muted">'+new Date(n.created_at).toLocaleString()+'</div></div>').join('')||'Sin avisos nuevos.';
-}async function loadUsers(){
+}
+async function loadControlDiario(){
+  if(me?.access_level!=='N1')return;
+  if(!$('controlDate').value)$('controlDate').value=new Date().toISOString().slice(0,10);
+  const date=$('controlDate').value;
+  const [or,cr,pr,qr]=await Promise.all([
+    sb.from('obras').select('id,codigo,nombre,direccion,estado').in('codigo',['001','002','003','004','005','006']).order('codigo'),
+    sb.from('fer_control_diario').select('*').eq('work_date',date),
+    sb.from('app_profiles').select('user_id,display_name,access_level,active').neq('access_level','N1').eq('active',true).order('display_name'),
+    sb.from('fer_direction_questions').select('id,obra_id,target_user_id,question,priority,status,answer,answered_at,validation_status,created_at').eq('status','answered').eq('validation_status','unvalidated').order('answered_at',{ascending:false})
+  ]);
+  if(or.error){$('controlObras').innerHTML='<div class="err">'+esc(or.error.message)+'</div>';return}
+  const controls=new Map((cr.data||[]).map(x=>[x.obra_id,x]));
+  $('controlObras').innerHTML=(or.data||[]).map(o=>{
+    const x=controls.get(o.id)||{};
+    return '<div class="userrow"><b>'+esc(o.codigo)+' · '+esc(o.nombre)+'</b>'+
+      '<div class="muted">'+esc(o.direccion||'')+'</div>'+
+      '<div><b>Situación:</b> '+esc(x.situacion||'Sin actualizar')+'</div>'+
+      '<div><b>Personal:</b> '+esc(x.personal||'Sin actualizar')+'</div>'+
+      '<div><b>Trabajos:</b> '+esc(x.trabajos||'Sin actualizar')+'</div>'+
+      '<div><b>Incidencias:</b> '+esc(x.incidencias||'Sin actualizar')+'</div>'+
+      '<div><b>Pendientes:</b> '+esc(x.pendientes||'Sin actualizar')+'</div>'+
+      '<button class="mini" data-edit-control="'+esc(o.id)+'">Actualizar</button></div>';
+  }).join('');
+  document.querySelectorAll('[data-edit-control]').forEach(b=>b.onclick=()=>editControlObra(b.dataset.editControl,date,or.data||[],controls));
+
+  $('questionTarget').innerHTML=(pr.data||[]).map(u=>'<option value="'+esc(u.user_id)+'">'+esc(u.display_name)+' · '+esc(u.access_level)+'</option>').join('')||'<option value="">Sin N2/N3 activos</option>';
+  $('questionObra').innerHTML=(or.data||[]).map(o=>'<option value="'+esc(o.id)+'">'+esc(o.codigo)+' · '+esc(o.nombre)+'</option>').join('');
+
+  const names=new Map((pr.data||[]).map(x=>[x.user_id,x.display_name]));
+  const obraNames=new Map((or.data||[]).map(x=>[x.id,x.codigo+' · '+x.nombre]));
+  $('controlAnswers').innerHTML=(qr.data||[]).map(q=>'<div class="userrow"><b>'+esc(names.get(q.target_user_id)||'Usuario')+' · '+esc(obraNames.get(q.obra_id)||'Obra')+'</b><div class="muted">Pregunta: '+esc(q.question)+'</div><div>'+esc(q.answer||'')+'</div><div class="rowActions"><button class="mini" data-validate-answer="'+q.id+'">Validar</button><button class="mini alt" data-reject-answer="'+q.id+'">Rechazar</button></div></div>').join('')||'<div class="muted">No hay respuestas pendientes.</div>';
+  document.querySelectorAll('[data-validate-answer]').forEach(b=>b.onclick=()=>validateControlAnswer(Number(b.dataset.validateAnswer),'validated'));
+  document.querySelectorAll('[data-reject-answer]').forEach(b=>b.onclick=()=>validateControlAnswer(Number(b.dataset.rejectAnswer),'rejected'));
+}
+async function editControlObra(obraId,date,obras,controls){
+  const x=controls.get(obraId)||{};
+  const situacion=prompt('Situación actual:',x.situacion||'');if(situacion===null)return;
+  const personal=prompt('Personal:',x.personal||'');if(personal===null)return;
+  const trabajos=prompt('Trabajos realizados:',x.trabajos||'');if(trabajos===null)return;
+  const incidencias=prompt('Incidencias:',x.incidencias||'');if(incidencias===null)return;
+  const pendientes=prompt('Pendientes:',x.pendientes||'');if(pendientes===null)return;
+  const economia=prompt('Economía / cobros / gastos (sólo N1):',x.economia||'');if(economia===null)return;
+  const {error}=await sb.from('fer_control_diario').upsert({
+    obra_id:obraId,work_date:date,situacion,personal,trabajos,incidencias,pendientes,economia,estado:'abierto'
+  },{onConflict:'obra_id,work_date'});
+  if(error)alert(error.message);else loadControlDiario();
+}
+async function validateControlAnswer(id,status){
+  const {error}=await sb.from('fer_direction_questions').update({validation_status:status,validated_by:me.user_id,validated_at:new Date().toISOString(),status:'closed'}).eq('id',id);
+  if(error)alert(error.message);else loadControlDiario();
+}
+async function sendControlQuestion(){
+  if(me?.access_level!=='N1')return;
+  const target=$('questionTarget').value,obra=$('questionObra').value,text=$('questionText').value.trim(),priority=$('questionPriority').value;
+  if(!target||!obra||!text)return alert('Selecciona usuario, obra y escribe la pregunta.');
+  const {error}=await sb.from('fer_direction_questions').insert({obra_id:obra,target_user_id:target,question:text,priority,status:'pending',validation_status:'unvalidated',created_by:me.user_id});
+  if(error)alert(error.message);else{$('questionText').value='';alert('Pregunta enviada.');loadControlDiario()}
+}
+async function loadDirectionWork(){
+  if(!me||me.access_level==='N1')return;
+  const {data,error}=await sb.from('fer_direction_questions').select('id,obra_id,question,priority,status,answer,created_at').eq('target_user_id',me.user_id).eq('status','pending').order('created_at',{ascending:false});
+  if(error||!(data||[]).length)return;
+  const q=data[0];
+  const ans=prompt((q.priority==='urgent'?'URGENTE · ':'')+'Dirección pregunta:\n'+q.question,'');
+  if(ans===null||!ans.trim())return;
+  await sb.from('fer_direction_questions').update({answer:ans.trim(),answered_at:new Date().toISOString(),status:'answered'}).eq('id',q.id);
+}
+let notifiedDirectionIds=new Set();
+async function pollDirectionNotifications(){
+  if(!me||me.access_level==='N1')return;
+  const {data}=await sb.from('fer_direction_notifications').select('id,title,body,priority,sound_required,vibration_required,acknowledged_at').eq('user_id',me.user_id).is('acknowledged_at',null).order('created_at',{ascending:false}).limit(10);
+  for(const n of (data||[]).reverse()){
+    if(notifiedDirectionIds.has(n.id))continue;
+    notifiedDirectionIds.add(n.id);
+    if(n.vibration_required&&navigator.vibrate)navigator.vibrate(n.priority==='urgent'?[250,120,250]:[180]);
+    if(n.sound_required){
+      try{
+        const ac=new (window.AudioContext||window.webkitAudioContext)();
+        const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.frequency.value=880;g.gain.value=.12;o.start();o.stop(ac.currentTime+.35);
+      }catch{}
+    }
+    alert(n.title+'\n\n'+n.body);
+    await sb.from('fer_direction_notifications').update({acknowledged_at:new Date().toISOString()}).eq('id',n.id);
+    loadDirectionWork();
+  }
+}
+async function loadUsers(){
   if(me?.access_level!=='N1'){return}
   const {data,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').order('display_name');
   if(error){$('pending').innerHTML='<div class="err">'+error.message+'</div>';return}
@@ -542,7 +651,7 @@ async function boot(){
     $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     const sessionKey='ferval_'+APP_VERSION+'_'+me.user_id;
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
-    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
+    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia','tileControlDiario'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
     if(n1){await loadUsers();await loadAudit()} await loadHistory();showView('homeView');
   }catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}
 }
@@ -566,6 +675,9 @@ $('createThreadBtn').onclick=createSupervisorThread;
 $('threadReplyBtn').onclick=replySupervisorThread;
 $('tileEquipo').onclick=async()=>{await loadUsers();showView('equipoView')};
 $('tileObras').onclick=async()=>{await loadObras();showView('obrasView')};
+$('tileControlDiario').onclick=async()=>{await loadControlDiario();showView('controlDiarioView')};
+$('sendDirectionQuestion').onclick=sendControlQuestion;
+$('controlDate').onchange=loadControlDiario;
 $('tileHistorial').onclick=async()=>{await loadAudit();showView('historialView')};
 $('tileChatsUsuarios').onclick=async()=>{await loadN1UserChats();showView('userChatsView')};
 $('loadUserChatsBtn').onclick=loadSelectedUserChats;
@@ -725,7 +837,7 @@ $('form').onsubmit=async e=>{
     add(e?.message||'No he podido conectar.','a');
   }finally{$('status').textContent=''}
 }
-setInterval(()=>{if(me?.access_level==='N1')loadDirectionAlerts()},15000);
+setInterval(()=>{if(me?.access_level==='N1')loadDirectionAlerts();else if(me)pollDirectionNotifications()},15000);
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session)await boot()})();
 </script>
 </body>
