@@ -121,11 +121,37 @@
         <option value="knowledge">Conocimiento / concepto</option>
         <option value="code_rule">Código / regla literal</option>
         <option value="policy_rule">Barrera / acción oculta N2-N3</option>
+        <option value="routine_rule">Rutina de Dirección programada</option>
       </select>
       <select id="learnScope">
         <option value="global_behavior">Aplicar al comportamiento de Yayo</option>
         <option value="n1_only">Sólo memoria de Dirección N1</option>
       </select>
+      <div id="routineFields" class="hidden">
+        <select id="routineTargets">
+          <option value="N3">Trabajadores N3</option>
+          <option value="N2">Responsables N2</option>
+          <option value="N2,N3">N2 y N3</option>
+        </select>
+        <input id="routineTime" class="field" type="time" value="07:30">
+        <select id="routineDays">
+          <option value="1,2,3,4,5">Lunes a viernes</option>
+          <option value="1,2,3,4,5,6">Lunes a sábado</option>
+          <option value="1,2,3,4,5,6,7">Todos los días</option>
+        </select>
+        <select id="routineEvidence">
+          <option value="part">Exigir parte</option>
+          <option value="checkin">Exigir check-in</option>
+          <option value="photo">Exigir foto</option>
+          <option value="none">Sólo enviar recordatorio</option>
+        </select>
+        <input id="routineDeadline" class="field" type="number" min="5" step="5" value="60" placeholder="Minutos de plazo">
+        <select id="routineMissAction">
+          <option value="escalate">Si falta: escalar a Dirección</option>
+          <option value="propose_warning">Si falta: proponer amonestación a N1</option>
+          <option value="log_only">Si falta: sólo registrar incumplimiento</option>
+        </select>
+      </div>
       <div id="policyFields" class="hidden">
         <select id="policyTargets">
           <option value="N2,N3">Aplicar a N2 y N3</option>
@@ -292,9 +318,11 @@ $('qAprende').onclick=()=>{
 }
 $('learnType').onchange=()=>{
   const policy=$('learnType').value==='policy_rule';
+  const routine=$('learnType').value==='routine_rule';
   $('policyFields').classList.toggle('hidden',!policy);
-  $('learnScope').classList.toggle('hidden',policy);
-  $('learnText').placeholder=policy?'Describe para Dirección qué hace esta barrera o acción…':'Escribe o pega aquí la instrucción, concepto o código que quieres que Yayo aprenda...';
+  $('routineFields').classList.toggle('hidden',!routine);
+  $('learnScope').classList.toggle('hidden',policy||routine);
+  $('learnText').placeholder=policy?'Describe para Dirección qué hace esta barrera o acción…':routine?'Describe qué debe pedir o recordar Yayo en esta rutina…':'Escribe o pega aquí la instrucción, concepto o código que quieres que Yayo aprenda...';
 }
 $('learnCancel').onclick=()=>{$('learnModalWrap').classList.add('hidden')}
 $('learnSave').onclick=async()=>{
@@ -332,6 +360,23 @@ $('learnSave').onclick=async()=>{
       created_by:me.user_id
     });
     error=result.error;
+  }else if(kind==='routine_rule'){
+    const time=$('routineTime').value;
+    const deadline=Math.max(5,Number($('routineDeadline').value||60));
+    const result=await sb.from('yayo_direction_routines').insert({
+      name:content.slice(0,100),
+      instruction:content,
+      timezone:'Europe/Madrid',
+      local_time:time,
+      days_of_week:$('routineDays').value.split(',').map(Number),
+      target_levels:$('routineTargets').value.split(','),
+      evidence_type:$('routineEvidence').value,
+      deadline_minutes:deadline,
+      miss_action:$('routineMissAction').value,
+      active:true,
+      created_by:me.user_id
+    });
+    error=result.error;
   }else{
     const scope=$('learnScope').value;
     const result=await sb.from('direction_memory').insert({
@@ -348,7 +393,7 @@ $('learnSave').onclick=async()=>{
   }
   $('learnSave').disabled=false;
   if(error){$('learnMsg').textContent='No se pudo guardar: '+error.message;return}
-  $('learnMsg').textContent=kind==='policy_rule'?'Regla oculta guardada y activa.':'Aprendizaje guardado y validado.';
+  $('learnMsg').textContent=kind==='policy_rule'?'Regla oculta guardada y activa.':kind==='routine_rule'?'Rutina programada y activa.':'Aprendizaje guardado y validado.';
   setTimeout(()=>{$('learnModalWrap').classList.add('hidden')},500);
 }
 $('newChat').onclick=createNewConversation;
