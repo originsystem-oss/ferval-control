@@ -315,14 +315,15 @@ async function createSupervisorThread(){
 }
 async function replySupervisorThread(){
   if(!currentSupervisorThread)return;
+  const threadId=currentSupervisorThread;
   const body=$('threadReply').value.trim();if(!body)return;
   const type=me.access_level==='N3'?'reply':'message';
-  const {error}=await sb.from('yayo_supervisor_messages').insert({thread_id:currentSupervisorThread,sender_user_id:me.user_id,body,message_type:type});
+  const {error}=await sb.from('yayo_supervisor_messages').insert({thread_id:threadId,sender_user_id:me.user_id,body,message_type:type});
   if(error)return alert(error.message);
   $('threadReply').value='';
   await loadSupervision();
-  const {data:threads}=await sb.from('yayo_supervisor_threads').select('id,manager_user_id,worker_user_id,title,status,created_at,updated_at').eq('id',currentSupervisorThread);
-  if(threads?.length)await openSupervisorThread(currentSupervisorThread,threads,new Map());
+  const {data:threads}=await sb.from('yayo_supervisor_threads').select('id,manager_user_id,worker_user_id,title,status,created_at,updated_at').eq('id',threadId);
+  if(threads?.length)await openSupervisorThread(threadId,threads,new Map());
 }
 async function loadUsers(){
   if(me?.access_level!=='N1'){return}
