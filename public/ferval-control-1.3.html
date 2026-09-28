@@ -120,11 +120,33 @@
         <option value="instruction">Instrucción de comportamiento</option>
         <option value="knowledge">Conocimiento / concepto</option>
         <option value="code_rule">Código / regla literal</option>
+        <option value="policy_rule">Barrera / acción oculta N2-N3</option>
       </select>
       <select id="learnScope">
         <option value="global_behavior">Aplicar al comportamiento de Yayo</option>
         <option value="n1_only">Sólo memoria de Dirección N1</option>
       </select>
+      <div id="policyFields" class="hidden">
+        <select id="policyTargets">
+          <option value="N2,N3">Aplicar a N2 y N3</option>
+          <option value="N2">Sólo N2</option>
+          <option value="N3">Sólo N3</option>
+        </select>
+        <select id="policyTriggerType">
+          <option value="contains">Cuando el mensaje contenga…</option>
+          <option value="regex">Patrón avanzado (regex)</option>
+          <option value="always">Siempre</option>
+        </select>
+        <input id="policyTrigger" class="field" placeholder="Palabra, frase o patrón que activa la regla">
+        <select id="policyAction">
+          <option value="block">Bloquear</option>
+          <option value="escalate">Escalar a Dirección</option>
+          <option value="block_and_escalate">Bloquear y escalar</option>
+          <option value="force_reply">Responder obligatoriamente con este texto</option>
+          <option value="log_security">Registrar evento de seguridad</option>
+        </select>
+        <input id="policyReply" class="field" placeholder="Respuesta visible al usuario (opcional)">
+      </div>
       <textarea id="learnText" placeholder="Escribe o pega aquí la instrucción, concepto o código que quieres que Yayo aprenda..."></textarea>
       <div id="learnMsg" class="muted"></div>
       <div class="modalActions"><button id="learnCancel" class="btn secondary">Cancelar</button><button id="learnSave" class="btn primary">Guardar aprendizaje</button></div>
@@ -268,6 +290,12 @@ $('qAprende').onclick=()=>{
   $('learnModalWrap').classList.remove('hidden');
   $('learnText').focus();
 }
+$('learnType').onchange=()=>{
+  const policy=$('learnType').value==='policy_rule';
+  $('policyFields').classList.toggle('hidden',!policy);
+  $('learnScope').classList.toggle('hidden',policy);
+  $('learnText').placeholder=policy?'Describe para Dirección qué hace esta barrera o acción…':'Escribe o pega aquí la instrucción, concepto o código que quieres que Yayo aprenda...';
+}
 $('learnCancel').onclick=()=>{$('learnModalWrap').classList.add('hidden')}
 $('learnSave').onclick=async()=>{
   if(me?.access_level!=='N1')return;
@@ -276,20 +304,51 @@ $('learnSave').onclick=async()=>{
   $('learnSave').disabled=true;
   $('learnMsg').textContent='Guardando…';
   const kind=$('learnType').value;
-  const scope=$('learnScope').value;
-  const {error}=await sb.from('direction_memory').insert({
-    memory_key:'direction_learning_'+Date.now(),
-    content,
-    source:'explicit_direction',
-    status:'validated',
-    validated_by:me.display_name,
-    validated_at:new Date().toISOString(),
-    source_session:sid,
-    metadata:{kind,scope,via:'learn_button',literal:kind==='code_rule'}
-  });
+  let error=null;
+  if(kind==='policy_rule'){
+    const targets=$('policyTargets').value.split(',');
+    const triggerType=$('policyTriggerType').value;
+    const triggerValue=triggerType==='always'?'*':$('policyTrigger').value.trim();
+    const actionType=$('policyAction').value;
+    const visibleReply=$('policyReply').value.trim();
+    if(triggerType!=='always'&&!triggerValue){
+      $('learnSave').disabled=false;$('learnMsg').textContent='Indica qué activa la regla.';return;
+    }
+    const result=await sb.from('yayo_policy_rules').insert({
+      name:content.slice(0,120),
+      description:content,
+      applies_to:targets,
+      trigger_type:triggerType,
+      trigger_value:triggerValue,
+      action_type:actionType,
+      action_payload:{
+        reply:visibleReply||undefined,
+        category:'direction_policy',
+        priority:'normal',
+        content:'Regla oculta de Dirección activada: '+content.slice(0,180)
+      },
+      priority:100,
+      active:true,
+      created_by:me.user_id
+    });
+    error=result.error;
+  }else{
+    const scope=$('learnScope').value;
+    const result=await sb.from('direction_memory').insert({
+      memory_key:'direction_learning_'+Date.now(),
+      content,
+      source:'explicit_direction',
+      status:'validated',
+      validated_by:me.display_name,
+      validated_at:new Date().toISOString(),
+      source_session:sid,
+      metadata:{kind,scope,via:'learn_button',literal:kind==='code_rule'}
+    });
+    error=result.error;
+  }
   $('learnSave').disabled=false;
   if(error){$('learnMsg').textContent='No se pudo guardar: '+error.message;return}
-  $('learnMsg').textContent='Aprendizaje guardado y validado.';
+  $('learnMsg').textContent=kind==='policy_rule'?'Regla oculta guardada y activa.':'Aprendizaje guardado y validado.';
   setTimeout(()=>{$('learnModalWrap').classList.add('hidden')},500);
 }
 $('newChat').onclick=createNewConversation;
