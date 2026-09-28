@@ -21,7 +21,7 @@
 .chatView{display:flex;flex-direction:column;min-height:calc(100dvh - 180px)}.chat{flex:1;display:flex;flex-direction:column;gap:10px;overflow:auto;padding-bottom:170px}.m{max-width:86%;padding:13px 15px;border-radius:17px;white-space:pre-wrap;line-height:1.38}.m.a{align-self:flex-start;background:#142238;border:1px solid #243d5c}.m.u{align-self:flex-end;background:#2e67ea}.composer{position:fixed;left:50%;transform:translateX(-50%);bottom:70px;width:min(760px,100%);padding:12px 18px;background:#06101df5;border-top:1px solid var(--line);z-index:6}.voiceRow{display:flex;justify-content:center;margin-bottom:9px}.micBig{width:64px;height:64px;border-radius:50%;border:1px solid #478dff;background:radial-gradient(circle at 50% 35%,#4e8cff,#2254c4);color:white;font-size:27px;box-shadow:0 0 0 8px #1e55c925}.micBig.listening{animation:pulse 1s infinite alternate}@keyframes pulse{to{box-shadow:0 0 0 14px #3579ff35}}.composeRow{display:flex;gap:8px}.composeRow input{flex:1;background:#0d1a2b;color:white;border:1px solid #314766;border-radius:15px;padding:13px 14px}.send{min-width:78px}.status{min-height:18px;color:var(--muted);font-size:12px;text-align:center;margin-bottom:5px}
 .quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.quick .mini{flex:1;min-width:95px}.panelTitle{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.panelTitle h2{margin:0}.back{background:#15243a;border:1px solid #304768;color:white}
 .bottom{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(760px,100%);height:72px;background:#07111ff5;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);z-index:8;backdrop-filter:blur(14px)}.tab{background:transparent;border:0;color:#aab7c8;font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}.tab b{font-size:21px}.tab.active{color:#4b8cff}
-.obra{padding:12px 0;border-bottom:1px solid #213550}.obra:last-child{border-bottom:0}.obra strong{display:block}.guide p{color:#c4cfdd;line-height:1.45}
+.obra{padding:12px 0;border-bottom:1px solid #213550}.obra:last-child{border-bottom:0}.obra strong{display:block}.guide p{color:#c4cfdd;line-height:1.45}.modalWrap{position:fixed;inset:0;background:#000a;display:flex;align-items:flex-end;justify-content:center;z-index:30;padding:16px}.learnModal{width:min(760px,100%);background:#0d1a2b;border:1px solid #314766;border-radius:22px;padding:18px;box-shadow:0 20px 70px #000a}.learnModal h3{margin:0 0 12px}.learnModal textarea,.learnModal select{width:100%;background:#091525;color:white;border:1px solid #314766;border-radius:12px;padding:12px;font:inherit;margin-top:8px}.learnModal textarea{min-height:170px;resize:vertical}.modalActions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 @media(min-width:620px){.grid{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
@@ -111,6 +111,25 @@
     <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Ayuda</h2><span></span></div>
     <section class="sectionCard"><p><b>Hablar:</b> pulsa el micrófono, dicta y después pulsa Enviar.</p><p><b>Parte:</b> registra una comunicación operativa.</p><p><b>Escalar:</b> N2/N3 envían un asunto a Dirección.</p><p><b>Recuerda:</b> guarda memoria propia del usuario.</p><p><b>Privacidad:</b> N2/N3 no tienen acceso a economía, memoria N1 ni conversaciones ajenas.</p></section>
   </main>
+
+  <div id="learnModalWrap" class="modalWrap hidden">
+    <div class="learnModal">
+      <h3>Enseñar a Yayo</h3>
+      <div class="muted">Sólo Dirección N1 puede guardar aprendizaje validado.</div>
+      <select id="learnType">
+        <option value="instruction">Instrucción de comportamiento</option>
+        <option value="knowledge">Conocimiento / concepto</option>
+        <option value="code_rule">Código / regla literal</option>
+      </select>
+      <select id="learnScope">
+        <option value="global_behavior">Aplicar al comportamiento de Yayo</option>
+        <option value="n1_only">Sólo memoria de Dirección N1</option>
+      </select>
+      <textarea id="learnText" placeholder="Escribe o pega aquí la instrucción, concepto o código que quieres que Yayo aprenda..."></textarea>
+      <div id="learnMsg" class="muted"></div>
+      <div class="modalActions"><button id="learnCancel" class="btn secondary">Cancelar</button><button id="learnSave" class="btn primary">Guardar aprendizaje</button></div>
+    </div>
+  </div>
 
   <nav class="bottom">
     <button id="tabHome" class="tab active"><b>⌂</b><span>Inicio</span></button>
@@ -242,7 +261,37 @@ $('tileAyuda').onclick=()=>showView('ayudaView');
 $('qParte').onclick=()=>{$('input').value='PARTE: ';$('input').focus()}
 $('qEscalar').onclick=()=>{$('input').value='ESCALAR: ';$('input').focus()}
 $('qRecuerda').onclick=()=>{$('input').value='RECUERDA: ';$('input').focus()}
-$('qAprende').onclick=()=>{$('input').value='APRENDE: ';$('input').focus()}
+$('qAprende').onclick=()=>{
+  if(me?.access_level!=='N1')return;
+  $('learnText').value='';
+  $('learnMsg').textContent='';
+  $('learnModalWrap').classList.remove('hidden');
+  $('learnText').focus();
+}
+$('learnCancel').onclick=()=>{$('learnModalWrap').classList.add('hidden')}
+$('learnSave').onclick=async()=>{
+  if(me?.access_level!=='N1')return;
+  const content=$('learnText').value.trim();
+  if(!content){$('learnMsg').textContent='Escribe algo para guardar.';return}
+  $('learnSave').disabled=true;
+  $('learnMsg').textContent='Guardando…';
+  const kind=$('learnType').value;
+  const scope=$('learnScope').value;
+  const {error}=await sb.from('direction_memory').insert({
+    memory_key:'direction_learning_'+Date.now(),
+    content,
+    source:'explicit_direction',
+    status:'validated',
+    validated_by:me.display_name,
+    validated_at:new Date().toISOString(),
+    source_session:sid,
+    metadata:{kind,scope,via:'learn_button',literal:kind==='code_rule'}
+  });
+  $('learnSave').disabled=false;
+  if(error){$('learnMsg').textContent='No se pudo guardar: '+error.message;return}
+  $('learnMsg').textContent='Aprendizaje guardado y validado.';
+  setTimeout(()=>{$('learnModalWrap').classList.add('hidden')},500);
+}
 $('newChat').onclick=createNewConversation;
 $('newChatFromHistory').onclick=async()=>{await createNewConversation();showView('chatView')}
 let mediaRecorder=null,audioChunks=[],recording=false,stream=null;
@@ -297,20 +346,6 @@ $('form').onsubmit=async e=>{
   add(t,'u');
   $('status').textContent='Yayo está pensando…';
   try{
-    const learn=t.match(/^(?:APRENDE|REGLA DE DIRECCIÓN):\s*(.+)$/i);
-    if(learn&&me?.access_level==='N1'){
-      const {error}=await sb.from('direction_memory').insert({
-        memory_key:'direction_rule_'+Date.now(),
-        content:learn[1].trim(),
-        source:'explicit_direction',
-        status:'validated',
-        validated_by:me.display_name,
-        validated_at:new Date().toISOString(),
-        source_session:sid,
-        metadata:{kind:'direction_learning',via:'n1_ui'}
-      });
-      if(error)throw new Error('No se pudo guardar el aprendizaje: '+error.message);
-    }
     const {data:{session}}=await sb.auth.getSession();
     const r=await fetch(FN+'/chat',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({message:t,sid})});
     const j=await r.json();
