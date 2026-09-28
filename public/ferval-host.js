@@ -1,5 +1,5 @@
-const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/552239e08b571a9fb4502209cf8cbaef2c8e340e/public/ferval-control-1.3.html';
-const SW_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/64c08ade03f553aeb83a1fe8dcbb4ba674e82e42/public/sw.js';
+const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/4fc51b52e7f8f68b5f541a511e300379ae45b42f/public/ferval-control-1.3.html';
+const SW_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/7bca6e05f748b25f0041989faeb62ab77659cf70/public/sw.js';
 const [html,sw]=await Promise.all([
   fetch(HTML_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
   fetch(SW_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text())
@@ -137,7 +137,7 @@ Bun.serve({
       }
     }
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'3.6-push-ui-fix'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'3.7-pwa-refresh'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -171,4 +171,4 @@ Bun.serve({
     return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
   }
 });
-console.log('FERVAL CONTROL 3.6 push UI fix host on',port);
+console.log('FERVAL CONTROL 3.7 PWA refresh host on',port);
