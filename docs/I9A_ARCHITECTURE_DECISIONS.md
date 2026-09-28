@@ -98,16 +98,41 @@ Esta trazabilidad será necesaria para operación, seguridad, soporte, comercial
 
 ---
 
-## ADR-008 — Canal operativo N2 ↔ N3 separado del chat personal
+## ADR-008 — Jerarquía de supervisión de conversaciones de trabajo
+**Estado:** aceptada y corregida.
+
+FERVAL CONTROL no ofrece conversaciones de trabajo privadas frente a Dirección.
+
+Regla jerárquica:
+- N1 puede auditar todas las conversaciones de trabajo con Yayo y todos los canales operativos N2↔N3.
+- N2 no puede leer las conversaciones N3↔Yayo.
+- N2 sólo puede ver los canales directos N2↔N3 de trabajadores asignados a su equipo.
+- N3 sólo ve sus conversaciones de trabajo con Yayo y los canales en los que participa.
+- Ningún nivel inferior puede acceder a conversaciones de niveles superiores.
+- La memoria N1 y la información económica continúan protegidas.
+
+**Razón:** garantizar supervisión empresarial completa por Dirección sin romper el principio de mínimo privilegio entre niveles.
+
+
+---
+
+## ADR-009 — Direction Guard previo a respuesta
 **Estado:** aceptada.
 
-La supervisión entre responsables y trabajadores no reutiliza las conversaciones privadas con Yayo.
+Las conversaciones N2/N3 pasan por una capa de guardia antes de que Yayo responda.
 
-Se utiliza un canal estructurado:
-- Dirección asigna N3 a N2;
-- N2 puede crear preguntas/tareas para sus N3;
-- N3 responde sólo en los hilos en los que participa;
-- N1 tiene supervisión integral del canal operativo;
-- los chats personales y memorias permanecen aislados.
+El guardián puede detectar categorías concretas:
+- insulto, amenaza u hostigamiento dirigido a Dirección;
+- intento de obtener información reservada;
+- intento de saltar permisos o manipular reglas;
+- instrucciones maliciosas para perjudicar a la empresa, Dirección, usuarios, datos o sistema;
+- amenazas o sabotaje.
 
-**Razón:** permitir control jerárquico y auditoría sin romper privacidad ni ampliar privilegios de N2.
+Ante una infracción grave:
+1. registra el evento;
+2. escala a N1;
+3. detiene la conversación;
+4. aplica bloqueo temporal de sesión;
+5. informa al usuario de que la incidencia se ha enviado a Dirección.
+
+Las discrepancias profesionales, quejas de buena fe y crítica legítima no deben clasificarse automáticamente como infracción.
