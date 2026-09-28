@@ -37,7 +37,7 @@ async function activateUser(id,level){
   const {error}=await sb.from('app_profiles').update({active:true,access_level:level}).eq('user_id',id);
   if(error)return alert(error.message);
   await sb.from('yayo_user_permissions').upsert({user_id:id,can_checkin:true,can_escalate:true,can_store_memory:true,can_receive_direction_shares:true,updated_by:me.user_id});
-  loadPending();
+  loadPending();loadAudit();
 }
 async function shareToUser(id){
   const input=$('share_'+id), content=input.value.trim();
@@ -69,7 +69,7 @@ async function loadShares(id){
   const box=$('shares_'+id);
   if(error){box.textContent=error.message;return}
   box.innerHTML=(data||[]).map(x=>'<div style="padding:5px 0">'+x.content+' <button class="mini alt" style="padding:4px 7px" data-revoke="'+x.id+'">Retirar</button></div>').join('')||'Nada compartido';
-  box.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('direction_user_shares').update({active:false}).eq('id',b.dataset.revoke);if(error)alert(error.message);else loadShares(id)});
+  box.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('direction_user_shares').update({active:false}).eq('id',b.dataset.revoke);if(error)alert(error.message);else{loadShares(id);loadAudit()}});
 }
 async function boot(){try{me=await profile();if(!me){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}if(!me.active){$('msg').innerHTML='<span class="err">Tu cuenta está pendiente de activación por Dirección.</span>';await sb.auth.signOut();$('login').classList.remove('hidden');$('app').classList.add('hidden');return}$('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;$('quick').classList.toggle('hidden',me.access_level==='N1');sid=localStorage.getItem('ferval13_'+me.user_id)||crypto.randomUUID();localStorage.setItem('ferval13_'+me.user_id,sid);$('chat').innerHTML='';await loadPending();if(me.access_level==='N1')await loadAudit();const {data:{session}}=await sb.auth.getSession();const r=await fetch(FN+'/history?sid='+encodeURIComponent(sid),{headers:{Authorization:'Bearer '+session.access_token}});const j=await r.json();for(const x of j.history||[])add(x.content,x.role==='assistant'?'a':'u');if(!(j.history||[]).length)add('Estoy aquí. ¿Qué necesitas?','a')}catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}}
 $('mode').onclick=()=>{signup=!signup;$('name').classList.toggle('hidden',!signup);$('go').textContent=signup?'Registrar':'Entrar';$('mode').textContent=signup?'Ya tengo cuenta':'Crear cuenta';$('msg').textContent=''}
