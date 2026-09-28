@@ -83,3 +83,31 @@ Cada cambio estructural deberá registrar:
 - I9A_SAAS_MULTI_TENANT_ROADMAP.md
 
 **Principio:** FERVAL será cliente/laboratorio de referencia; el producto futuro será multiempresa y configurable.
+
+
+---
+
+## 2026-09-28 — Piloto N2 → N3 supervisado por N1
+**Objetivo:** habilitar un circuito operativo para responsables N2 sin exponer información de Dirección.
+
+**Solución:**
+- asignaciones explícitas N2 → N3;
+- N2 sólo ve trabajadores N3 asignados;
+- canal operativo independiente del chat personal de Yayo;
+- preguntas, tareas, solicitudes de evidencia y respuestas;
+- N1 puede supervisar todos los hilos operativos;
+- N3 sólo ve sus propios hilos con el responsable asignado.
+
+**Seguridad:**
+- N2 mantiene bloqueo de información económica;
+- no se expone memoria N1;
+- no se exponen conversaciones personales de otros usuarios;
+- acceso controlado mediante RLS.
+
+**Prueba RLS reversible:**
+- N2 perfiles visibles: 2 (propio + N3 asignado);
+- N2 facturas visibles: 0;
+- N2 hilo visible: 1;
+- N3 hilo visible: 1;
+- N3 mensajes visibles en el hilo: 2.
+La prueba se ejecutó dentro de una transacción y se revirtió.
