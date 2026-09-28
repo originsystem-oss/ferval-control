@@ -84,7 +84,7 @@ const icon512=await makeFervalIcon(512);
 const manifest=JSON.stringify({
   name:'FERVAL CONTROL',
   short_name:'FERVAL',
-  start_url:'/',
+  start_url:'/app',
   display:'standalone',
   background_color:'#06101d',
   theme_color:'#06101d',
@@ -137,7 +137,7 @@ Bun.serve({
       }
     }
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'3.7-pwa-refresh'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'3.8-clean-app-route'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -168,7 +168,13 @@ Bun.serve({
         return new Response(JSON.stringify({error:'No se pudo procesar el audio'}),{status:500,headers:{'content-type':'application/json'}});
       }
     }
-    return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
+    if(u.pathname==='/app'||u.pathname==='/app/'){
+      return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','pragma':'no-cache','expires':'0','x-ferval-version':'3.8'}});
+    }
+    if(u.pathname==='/'){
+      return Response.redirect(new URL('/app?v=3.8',u.origin),302);
+    }
+    return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','x-ferval-version':'3.8'}});
   }
 });
-console.log('FERVAL CONTROL 3.7 PWA refresh host on',port);
+console.log('FERVAL CONTROL 3.8 clean app route host on',port);
