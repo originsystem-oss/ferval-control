@@ -148,7 +148,7 @@ async function boot(){
     me=await profile();
     if(!me){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}
     if(!me.active){$('msg').innerHTML='<span class="err">Tu cuenta está pendiente de activación por Dirección.</span>';await sb.auth.signOut();return}
-    $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name+' · '+(me.access_level==='N1'?'Dirección':me.access_level);$('badge').textContent=me.access_level;
+    $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     sid=localStorage.getItem('ferval13_'+me.user_id)||crypto.randomUUID();localStorage.setItem('ferval13_'+me.user_id,sid);
     const n1=me.access_level==='N1';['tileObras','tileEquipo','tileHistorial'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('homePending').textContent=n1?'Cargando…':'Gestionado por Dirección';$('homeAudit').textContent=n1?'Cargando…':'Privado de Dirección';
     if(n1){await loadUsers();await loadAudit()} await loadHistory();showView('homeView');
