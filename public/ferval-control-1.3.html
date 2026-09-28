@@ -169,9 +169,50 @@ $('tileAyuda').onclick=()=>showView('ayudaView');
 $('qParte').onclick=()=>{$('input').value='PARTE: ';$('input').focus()}
 $('qEscalar').onclick=()=>{$('input').value='ESCALAR: ';$('input').focus()}
 $('qRecuerda').onclick=()=>{$('input').value='RECUERDA: ';$('input').focus()}
-const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-if(SpeechRecognition){recognition=new SpeechRecognition();recognition.lang='es-ES';recognition.interimResults=true;recognition.continuous=false;recognition.onstart=()=>{listening=true;$('mic').classList.add('listening');$('status').textContent='Escuchando…'};recognition.onresult=e=>{let f='',i='';for(let n=e.resultIndex;n<e.results.length;n++){const t=e.results[n][0].transcript;e.results[n].isFinal?f+=t:i+=t}$('input').value=(f||i).trim()};recognition.onerror=e=>{listening=false;$('mic').classList.remove('listening');$('status').textContent=e.error==='not-allowed'?'Activa el permiso de micrófono para hablar con Yayo.':'No he podido escuchar. Puedes seguir escribiendo.'};recognition.onend=()=>{listening=false;$('mic').classList.remove('listening');if($('status').textContent==='Escuchando…')$('status').textContent='';$('input').focus()}}
-$('mic').onclick=()=>{if(!recognition){$('status').textContent='El reconocimiento de voz no está disponible aquí. Puedes seguir escribiendo.';return}try{listening?recognition.stop():recognition.start()}catch{}}
+let mediaRecorder=null,audioChunks=[],recording=false,stream=null;
+async function startRecording(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const preferred=['audio/mp4','audio/webm;codecs=opus','audio/webm'];
+    const mime=preferred.find(x=>window.MediaRecorder&&MediaRecorder.isTypeSupported(x))||'';
+    mediaRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+    audioChunks=[];
+    mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)audioChunks.push(e.data)};
+    mediaRecorder.onstart=()=>{recording=true;$('mic').classList.add('listening');$('status').textContent='Grabando… pulsa otra vez para terminar.'};
+    mediaRecorder.onstop=async()=>{
+      recording=false;$('mic').classList.remove('listening');$('status').textContent='Transcribiendo…';
+      const type=mediaRecorder.mimeType||'audio/mp4';
+      const ext=type.includes('webm')?'webm':'m4a';
+      const blob=new Blob(audioChunks,{type});
+      stream?.getTracks().forEach(t=>t.stop());
+      const fd=new FormData();
+      fd.append('file',blob,'voz.'+ext);
+      fd.append('model','whisper-1');
+      fd.append('language','es');
+      try{
+        const r=await fetch('/api/transcribe',{method:'POST',body:fd});
+        const j=await r.json();
+        if(!r.ok) throw new Error(j.error?.message||j.error||'No se pudo transcribir');
+        $('input').value=(j.text||'').trim();
+        $('status').textContent=$('input').value?'Audio listo. Pulsa Enviar.':'No he entendido el audio. Puedes repetirlo.';
+        $('input').focus();
+      }catch(e){
+        $('status').textContent='No he podido transcribir el audio. Puedes seguir escribiendo.';
+      }
+    };
+    mediaRecorder.start();
+  }catch(e){
+    $('status').textContent='Necesito permiso de micrófono. Puedes seguir escribiendo.';
+  }
+}
+$('mic').onclick=async()=>{
+  if(recording&&mediaRecorder){mediaRecorder.stop();return}
+  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){
+    $('status').textContent='Este navegador no permite grabación de voz. Puedes seguir escribiendo.';
+    return;
+  }
+  await startRecording();
+}
 $('form').onsubmit=async e=>{e.preventDefault();const t=$('input').value.trim();if(!t)return;$('input').value='';add(t,'u');$('status').textContent='Yayo está pensando…';try{const {data:{session}}=await sb.auth.getSession();const r=await fetch(FN+'/chat',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({message:t,sid})});const j=await r.json();add(j.reply||j.error||'No he podido responder.','a')}catch{add('No he podido conectar.','a')}finally{$('status').textContent=''}}
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session)await boot()})();
 </script>
