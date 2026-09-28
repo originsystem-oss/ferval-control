@@ -92,7 +92,7 @@ Bun.serve({
   async fetch(req){
     const u=new URL(req.url);
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'2.3-status-sessions'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'2.4-conversation-history'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -126,4 +126,4 @@ Bun.serve({
     return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
   }
 });
-console.log('FERVAL CONTROL 2.3 status+sessions host on',port);
+console.log('FERVAL CONTROL 2.4 history host on',port);
