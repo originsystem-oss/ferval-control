@@ -102,20 +102,36 @@ Bun.serve({
     if(u.pathname==='/sw.js'){
       return new Response(sw,{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-cache','service-worker-allowed':'/'}});
     }
-    if(u.pathname==='/api/push/send'&&req.method==='POST'){
-      const secret=req.headers.get('x-push-secret')||'';
-      if(!process.env.PUSH_INTERNAL_SECRET||secret!==process.env.PUSH_INTERNAL_SECRET)return new Response('forbidden',{status:403});
+    if(u.pathname==='/api/push/dispatch'&&req.method==='POST'){
       try{
+        const token=(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');
+        if(!token)return new Response(JSON.stringify({error:'unauthorized'}),{status:401,headers:{'content-type':'application/json'}});
+        const sbUrl=process.env.SUPABASE_URL,anon=process.env.SUPABASE_PUBLISHABLE_KEY;
+        const userResp=await fetch(sbUrl+'/auth/v1/user',{headers:{apikey:anon,authorization:'Bearer '+token}});
+        if(!userResp.ok)return new Response(JSON.stringify({error:'unauthorized'}),{status:401,headers:{'content-type':'application/json'}});
+        const user=await userResp.json();
+        const profResp=await fetch(sbUrl+'/rest/v1/app_profiles?user_id=eq.'+encodeURIComponent(user.id)+'&select=access_level,active&limit=1',{headers:{apikey:anon,authorization:'Bearer '+token}});
+        const prof=(await profResp.json())?.[0];
+        if(!prof?.active||prof.access_level!=='N1')return new Response(JSON.stringify({error:'forbidden'}),{status:403,headers:{'content-type':'application/json'}});
         const body=await req.json();
-        const sub={endpoint:body.endpoint,keys:{p256dh:body.p256dh,auth:body.auth}};
-        await webpush.sendNotification(sub,JSON.stringify({
-          title:body.title||'FERVAL CONTROL',
-          body:body.body||'Aviso de Dirección',
-          priority:body.priority||'urgent',
-          url:body.url||'/',
-          tag:body.tag||'ferval-direction'
-        }));
-        return new Response(JSON.stringify({ok:true}),{headers:{'content-type':'application/json'}});
+        const target=String(body.target_user_id||'');
+        if(!target)return new Response(JSON.stringify({error:'target required'}),{status:400,headers:{'content-type':'application/json'}});
+        const subResp=await fetch(sbUrl+'/rest/v1/fer_push_subscriptions?user_id=eq.'+encodeURIComponent(target)+'&active=eq.true&select=endpoint,p256dh,auth',{headers:{apikey:anon,authorization:'Bearer '+token}});
+        const subs=await subResp.json();
+        let sent=0,failed=0;
+        for(const s of (subs||[])){
+          try{
+            await webpush.sendNotification({endpoint:s.endpoint,keys:{p256dh:s.p256dh,auth:s.auth}},JSON.stringify({
+              title:body.title||'FERVAL CONTROL',
+              body:body.body||'Aviso de Dirección',
+              priority:body.priority||'urgent',
+              url:body.url||'/',
+              tag:body.tag||'ferval-direction'
+            }));
+            sent++;
+          }catch{failed++}
+        }
+        return new Response(JSON.stringify({ok:true,sent,failed}),{headers:{'content-type':'application/json'}});
       }catch(e){
         return new Response(JSON.stringify({ok:false,error:String(e)}),{status:500,headers:{'content-type':'application/json'}});
       }
