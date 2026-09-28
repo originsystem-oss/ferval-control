@@ -289,7 +289,7 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='4.3';
+const APP_VERSION='4.4';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
 const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','avisoUrgenteView','controlDiarioView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
@@ -693,17 +693,35 @@ async function loadUsers(){
   const rows=data||[], pend=rows.filter(x=>!x.active), act=rows.filter(x=>x.active&&x.access_level!=='N1');
   $('homePending').textContent=pend.length?pend.length+' usuario(s) pendientes':'No hay usuarios pendientes';
   $('pending').innerHTML='<h3>Pendientes</h3>'+(
-    pend.map(x=>'<div class="userrow"><b>'+x.display_name+'</b><div class="rowActions"><button class="mini" data-n2="'+x.user_id+'">Activar N2</button><button class="mini alt" data-n3="'+x.user_id+'">Activar N3</button></div></div>').join('')||'<div class="muted">No hay usuarios pendientes</div>'
+    pend.map(x=>'<div class="userrow"><b>'+x.display_name+'</b><div class="rowActions"><button class="mini" data-n2="'+x.user_id+'">Activar N2</button><button class="mini alt" data-n3="'+x.user_id+'">Activar N3 + asignar</button></div></div>').join('')||'<div class="muted">No hay usuarios pendientes</div>'
   );
   $('activeUsers').innerHTML='<h3>Usuarios activos</h3>'+(
     act.map(x=>'<div class="userrow"><b>'+x.display_name+' · '+x.access_level+'</b><div class="sharebox"><input id="share_'+x.user_id+'" placeholder="Compartir sólo información operativa"><button class="mini" data-share="'+x.user_id+'">Compartir</button></div><div id="shares_'+x.user_id+'" class="muted"></div><div class="rowActions"><button class="mini alt" data-loadshares="'+x.user_id+'">Ver compartido</button><button class="mini alt" data-role="'+x.user_id+'" data-level="'+(x.access_level==='N2'?'N3':'N2')+'">Cambiar a '+(x.access_level==='N2'?'N3':'N2')+'</button><button class="mini alt" data-disable="'+x.user_id+'">Desactivar</button></div></div>').join('')||'<div class="muted">No hay usuarios N2/N3 activos</div>'
   );
   document.querySelectorAll('[data-n2]').forEach(b=>b.onclick=()=>activateUser(b.dataset.n2,'N2'));
-  document.querySelectorAll('[data-n3]').forEach(b=>b.onclick=()=>activateUser(b.dataset.n3,'N3'));
+  document.querySelectorAll('[data-n3]').forEach(b=>b.onclick=()=>activateN3AndAssign(b.dataset.n3));
   document.querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>shareToUser(b.dataset.share));
   document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>changeRole(b.dataset.role,b.dataset.level));
   document.querySelectorAll('[data-disable]').forEach(b=>b.onclick=()=>disableUser(b.dataset.disable));
   document.querySelectorAll('[data-loadshares]').forEach(b=>b.onclick=()=>loadShares(b.dataset.loadshares));
+}
+async function activateN3AndAssign(id){
+  if(me?.access_level!=='N1')return;
+  const {data:managers,error:me2}=await sb.from('app_profiles').select('user_id,display_name').eq('access_level','N2').eq('active',true).order('display_name');
+  if(me2)return alert(me2.message);
+  if(!(managers||[]).length)return alert('No hay ningún N2 activo al que asignar este N3.');
+  const options=(managers||[]).map((m,i)=>(i+1)+'. '+m.display_name).join('\n');
+  const choice=prompt('Selecciona el N2 responsable:\n'+options,'1');
+  if(choice===null)return;
+  const idx=Number(choice)-1,manager=(managers||[])[idx];
+  if(!manager)return alert('Selección no válida.');
+  const {error}=await sb.from('app_profiles').update({active:true,access_level:'N3'}).eq('user_id',id);
+  if(error)return alert(error.message);
+  await sb.from('yayo_user_permissions').upsert({user_id:id,can_checkin:true,can_escalate:true,can_store_memory:true,can_receive_direction_shares:true,updated_by:me.user_id});
+  const ar=await sb.from('yayo_supervisor_assignments').upsert({manager_user_id:manager.user_id,worker_user_id:id,active:true,created_by:me.user_id},{onConflict:'manager_user_id,worker_user_id'});
+  if(ar.error)return alert('N3 activado, pero falló la asignación: '+ar.error.message);
+  alert('N3 activado y asignado a '+manager.display_name+'.');
+  await loadUsers();await loadAudit();
 }
 async function activateUser(id,level){const {error}=await sb.from('app_profiles').update({active:true,access_level:level}).eq('user_id',id);if(error)return alert(error.message);await sb.from('yayo_user_permissions').upsert({user_id:id,can_checkin:true,can_escalate:true,can_store_memory:true,can_receive_direction_shares:true,updated_by:me.user_id});await loadUsers();await loadAudit()}
 async function shareToUser(id){const input=$('share_'+id),content=input.value.trim();if(!content)return;const {error}=await sb.from('direction_user_shares').insert({user_id:id,share_key:'direction_'+Date.now(),content,category:'operational',created_by:me.user_id,active:true});if(error)return alert(error.message);input.value='';await loadAudit();alert('Información operativa compartida sólo con ese usuario.')}
