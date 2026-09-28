@@ -140,3 +140,35 @@ La prueba se ejecutó dentro de una transacción y se revirtió.
 - notificaciones push registradas por usuario/dispositivo.
 
 **Estado:** piloto N2 funcional para continuar pruebas. Pendiente ampliar circuito con N3 de ensayo y terminar automatización de preguntas/respuestas del Control Diario.
+
+
+---
+
+## 2026-09-28 — Circuito jerárquico N1 → N2 → N3
+**Estado técnico:** probado de forma reversible.
+
+### Canal operativo N2↔N3
+Prueba:
+- N2 facturas visibles: 0.
+- N2 hilo asignado visible: 1.
+- N3 hilo asignado visible: 1.
+- N3 respondió en el hilo.
+- N2 vio los 2 mensajes.
+- N2 recibió 1 notificación operativa pendiente.
+
+### Control Diario / preguntas de Dirección
+Prueba:
+- N1 crea pregunta dirigida.
+- N2 responde mediante RPC restringida.
+- Tras respuesta: answered / unvalidated.
+- N1 valida mediante RPC exclusiva.
+- Tras validación: closed / validated.
+
+### Seguridad
+- N2/N3 no pueden auto-validar información de Control Diario.
+- La respuesta no puede modificar destinatario, pregunta, prioridad o validación.
+- Economía continúa fuera del acceso N2/N3.
+- N1 mantiene supervisión de los canales operativos.
+
+Todas las pruebas se ejecutaron dentro de transacciones y se revirtieron.
+Pendiente para prueba física: crear una cuenta N3 real en un tercer usuario/dispositivo y asignarla a Jesús N2.
