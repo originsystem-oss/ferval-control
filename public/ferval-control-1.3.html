@@ -62,7 +62,7 @@
       <button id="tileGuardia" class="tile n1only"><div class="tileIcon">🚨</div><strong>Guardia Dirección</strong><span>Incidencias y bloqueos</span></button>
       <button id="tileAyuda" class="tile"><div class="tileIcon">❓</div><strong>Ayuda</strong><span>Cómo usar FERVAL CONTROL</span></button>
     </div>
-    <section id="pushSetupCard" class="sectionCard"><h3>🔔 Avisos urgentes</h3><div id="pushStatus" class="muted">Activa las notificaciones para recibir avisos de Dirección aunque la app esté cerrada.</div><button id="enablePushBtn" class="btn primary full" style="margin-top:10px">Activar notificaciones</button></section>
+    <section id="pushSetupCard" class="sectionCard"><h3>🔔 Avisos urgentes</h3><div id="pushStatus" class="muted">Activa las notificaciones para recibir avisos de Dirección aunque la app esté cerrada.</div><button id="enablePushBtn" type="button" class="btn primary full" style="margin-top:10px" onclick="window.__fervalEnablePush&&window.__fervalEnablePush()">Activar notificaciones</button></section>
     <section id="notificationsCard" class="sectionCard"><h3>Avisos</h3><div id="homeNotifications" class="muted">Sin avisos nuevos.</div></section>
     <section id="homePendingCard" class="sectionCard" style="display:none"><h3>Usuarios pendientes</h3><div id="homePending" class="muted">Cargando…</div></section>
     <section id="homeAuditCard" class="sectionCard" style="display:none"><h3>Historial de Dirección</h3><div id="homeAudit" class="muted">Cargando…</div></section>
@@ -276,7 +276,7 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='3.9';
+const APP_VERSION='4.0';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
 const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','controlDiarioView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
@@ -493,8 +493,15 @@ async function setupPushUI(){
   }
 }
 async function enablePush(){
-  if(!me)return;
+  const statusEl=document.getElementById('pushStatus');
+  const btn=document.getElementById('enablePushBtn');
+  if(statusEl)statusEl.textContent='Solicitando permiso de notificaciones…';
+  if(btn)btn.textContent='Activando…';
   try{
+    if(!me)throw new Error('Sesión de usuario no disponible. Cierra sesión y vuelve a entrar.');
+    if(!('Notification' in window))throw new Error('Notification API no disponible en este navegador.');
+    if(!('serviceWorker' in navigator))throw new Error('Service Worker no disponible.');
+    if(!('PushManager' in window))throw new Error('PushManager no disponible.');
     const permission=await Notification.requestPermission();
     if(permission!=='granted'){alert('Necesitas permitir notificaciones para recibir avisos urgentes con la app cerrada.');return}
     const reg=await navigator.serviceWorker.register('/sw.js?v=1');
@@ -515,8 +522,14 @@ async function enablePush(){
     $('pushStatus').textContent='Notificaciones urgentes activadas en este dispositivo.';
     $('enablePushBtn').textContent='Notificaciones activadas';
     $('enablePushBtn').disabled=true;
-  }catch(e){alert('No se pudieron activar las notificaciones: '+(e?.message||e))}
+  }catch(e){
+    const msg='No se pudieron activar las notificaciones: '+(e?.message||e);
+    if(statusEl)statusEl.textContent=msg;
+    if(btn){btn.textContent='Reintentar activación';btn.disabled=false}
+    alert(msg);
+  }
 }
+window.__fervalEnablePush=enablePush;
 async function loadNotifications(){
   if(!me)return;
   const {data,error}=await sb.from('yayo_user_notifications').select('id,title,body,kind,created_at,read_at').eq('user_id',me.user_id).order('created_at',{ascending:false}).limit(10);
@@ -747,7 +760,7 @@ $('tileEquipo').onclick=async()=>{await loadUsers();showView('equipoView')};
 $('tileObras').onclick=async()=>{await loadObras();showView('obrasView')};
 $('tileControlDiario').onclick=async()=>{await loadControlDiario();showView('controlDiarioView')};
 $('sendDirectionQuestion').onclick=sendControlQuestion;
-$('enablePushBtn').onclick=enablePush;
+// Push button uses direct resilient handler.
 $('controlDate').onchange=loadControlDiario;
 $('tileHistorial').onclick=async()=>{await loadAudit();showView('historialView')};
 $('tileChatsUsuarios').onclick=async()=>{await loadN1UserChats();showView('userChatsView')};
