@@ -47,7 +47,8 @@ async function buildContext(profile,token){
   const base={usuario:{nombre:profile.display_name,nivel:profile.access_level},memoriaUsuario:userMem,capacidades:allowedCapabilities(caps,profile.access_level)};
   if(profile.access_level==="N3")return base;
   if(profile.access_level==="N2"){
-    const obras=await sb("obras?select=codigo,nombre,estado&order=codigo",token);
+    const r=await sbWrite("rpc/get_operational_obras","POST",{},token,"return=representation");
+    const obras=Array.isArray(r.data)?r.data:[];
     return {...base,obrasOperativas:obras};
   }
   const [dirMem,mem,obras,sources]=await Promise.all([
