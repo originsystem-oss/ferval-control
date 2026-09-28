@@ -94,3 +94,20 @@ Toda acción relevante de Yayo deberá poder responder:
 - si hubo aprobación humana.
 
 Esta trazabilidad será necesaria para operación, seguridad, soporte, comercialización y futura protección de IP.
+
+
+---
+
+## ADR-008 — Canal operativo N2 ↔ N3 separado del chat personal
+**Estado:** aceptada.
+
+La supervisión entre responsables y trabajadores no reutiliza las conversaciones privadas con Yayo.
+
+Se utiliza un canal estructurado:
+- Dirección asigna N3 a N2;
+- N2 puede crear preguntas/tareas para sus N3;
+- N3 responde sólo en los hilos en los que participa;
+- N1 tiene supervisión integral del canal operativo;
+- los chats personales y memorias permanecen aislados.
+
+**Razón:** permitir control jerárquico y auditoría sin romper privacidad ni ampliar privilegios de N2.
