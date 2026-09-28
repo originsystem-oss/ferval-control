@@ -23,12 +23,14 @@ async function loadPending(){
     ||'<div class="muted" style="padding-top:8px">No hay usuarios pendientes</div>'
   );
   active.innerHTML='<div class="sectionTitle">Usuarios activos</div>'+(
-    act.map(x=>'<div class="userrow"><div style="flex:1"><b>'+x.display_name+'</b><div class="muted">'+x.access_level+'</div><div class="sharebox"><input id="share_'+x.user_id+'" placeholder="Compartir información concreta"><button class="mini" data-share="'+x.user_id+'">Compartir</button></div></div></div>').join('')
+    act.map(x=>'<div class="userrow"><div style="flex:1"><b>'+x.display_name+'</b><div class="muted">'+x.access_level+'</div><div class="sharebox"><input id="share_'+x.user_id+'" placeholder="Compartir sólo información operativa"><button class="mini" data-share="'+x.user_id+'">Compartir</button></div><div style="margin-top:8px"><button class="mini alt" data-role="'+x.user_id+'" data-level="'+(x.access_level==='N2'?'N3':'N2')+'">Cambiar a '+(x.access_level==='N2'?'N3':'N2')+'</button> <button class="mini alt" data-disable="'+x.user_id+'">Desactivar</button></div></div></div>').join('')
     ||'<div class="muted" style="padding-top:8px">No hay usuarios N2/N3 activos</div>'
   );
   document.querySelectorAll('[data-n2]').forEach(b=>b.onclick=()=>activateUser(b.dataset.n2,'N2'));
   document.querySelectorAll('[data-n3]').forEach(b=>b.onclick=()=>activateUser(b.dataset.n3,'N3'));
   document.querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>shareToUser(b.dataset.share));
+  document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>changeRole(b.dataset.role,b.dataset.level));
+  document.querySelectorAll('[data-disable]').forEach(b=>b.onclick=()=>disableUser(b.dataset.disable));
 }
 async function activateUser(id,level){
   const {error}=await sb.from('app_profiles').update({active:true,access_level:level}).eq('user_id',id);
@@ -43,7 +45,17 @@ async function shareToUser(id){
   const {error}=await sb.from('direction_user_shares').insert({user_id:id,share_key:key,content,category:'operational',created_by:me.user_id,active:true});
   if(error)return alert(error.message);
   input.value='';
-  alert('Información compartida sólo con ese usuario.');
+  alert('Información operativa compartida sólo con ese usuario.');
+}
+async function changeRole(id,level){
+  const {error}=await sb.from('app_profiles').update({access_level:level}).eq('user_id',id);
+  if(error)return alert(error.message);
+  loadPending();
+}
+async function disableUser(id){
+  const {error}=await sb.from('app_profiles').update({active:false,disabled_at:new Date().toISOString(),disabled_reason:'Desactivado por Dirección'}).eq('user_id',id);
+  if(error)return alert(error.message);
+  loadPending();
 }
 async function boot(){try{me=await profile();if(!me){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}if(!me.active){$('msg').innerHTML='<span class="err">Tu cuenta está pendiente de activación por Dirección.</span>';await sb.auth.signOut();$('login').classList.remove('hidden');$('app').classList.add('hidden');return}$('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;sid=localStorage.getItem('ferval13_'+me.user_id)||crypto.randomUUID();localStorage.setItem('ferval13_'+me.user_id,sid);$('chat').innerHTML='';await loadPending();const {data:{session}}=await sb.auth.getSession();const r=await fetch(FN+'/history?sid='+encodeURIComponent(sid),{headers:{Authorization:'Bearer '+session.access_token}});const j=await r.json();for(const x of j.history||[])add(x.content,x.role==='assistant'?'a':'u');if(!(j.history||[]).length)add('Estoy aquí. ¿Qué necesitas?','a')}catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}}
 $('mode').onclick=()=>{signup=!signup;$('name').classList.toggle('hidden',!signup);$('go').textContent=signup?'Registrar':'Entrar';$('mode').textContent=signup?'Ya tengo cuenta':'Crear cuenta';$('msg').textContent=''}
