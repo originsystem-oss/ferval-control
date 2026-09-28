@@ -289,7 +289,7 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='4.2';
+const APP_VERSION='4.3';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
 const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','avisoUrgenteView','controlDiarioView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
@@ -545,9 +545,23 @@ async function enablePush(){
 window.__fervalEnablePush=enablePush;
 async function loadNotifications(){
   if(!me)return;
-  const {data,error}=await sb.from('yayo_user_notifications').select('id,title,body,kind,created_at,read_at').eq('user_id',me.user_id).order('created_at',{ascending:false}).limit(10);
-  if(error){$('homeNotifications').textContent='No se pudieron cargar los avisos.';return}
-  $('homeNotifications').innerHTML=(data||[]).map(n=>'<div class="auditrow"><b>'+esc(n.title)+'</b><div>'+esc(n.body)+'</div><div class="muted">'+new Date(n.created_at).toLocaleString()+'</div></div>').join('')||'Sin avisos nuevos.';
+  const [general,oper]=await Promise.all([
+    sb.from('yayo_user_notifications').select('id,title,body,kind,created_at,read_at').eq('user_id',me.user_id).order('created_at',{ascending:false}).limit(10),
+    sb.from('yayo_supervisor_notifications').select('id,title,body,thread_id,created_at,read_at').eq('user_id',me.user_id).is('read_at',null).order('created_at',{ascending:false}).limit(10)
+  ]);
+  if(general.error){$('homeNotifications').textContent='No se pudieron cargar los avisos.';return}
+  const rows=[
+    ...(oper.data||[]).map(n=>({...n,oper:true})),
+    ...(general.data||[]).map(n=>({...n,oper:false}))
+  ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,12);
+  $('homeNotifications').innerHTML=rows.map(n=>'<div class="auditrow"><b>'+esc(n.title)+'</b><div>'+esc(n.body)+'</div><div class="muted">'+new Date(n.created_at).toLocaleString()+'</div>'+(n.oper?'<button class="mini" data-open-oper-notice="'+n.id+'" data-thread-notice="'+esc(n.thread_id)+'">Abrir</button>':'')+'</div>').join('')||'Sin avisos nuevos.';
+  document.querySelectorAll('[data-open-oper-notice]').forEach(b=>b.onclick=async()=>{
+    await sb.from('yayo_supervisor_notifications').update({read_at:new Date().toISOString()}).eq('id',Number(b.dataset.openOperNotice));
+    await loadSupervision();showView('supervisionView');
+    const {data:threads}=await sb.from('yayo_supervisor_threads').select('id,manager_user_id,worker_user_id,title,status,created_at,updated_at').eq('id',b.dataset.threadNotice);
+    if(threads?.length)await openSupervisorThread(b.dataset.threadNotice,threads,new Map());
+    loadNotifications();
+  });
 }
 
 async function loadUrgentTargets(){
@@ -621,7 +635,7 @@ async function editControlObra(obraId,date,obras,controls){
   if(error)alert(error.message);else loadControlDiario();
 }
 async function validateControlAnswer(id,status){
-  const {error}=await sb.from('fer_direction_questions').update({validation_status:status,validated_by:me.user_id,validated_at:new Date().toISOString(),status:'closed'}).eq('id',id);
+  const {error}=await sb.rpc('review_direction_answer',{p_question_id:id,p_decision:status});
   if(error)alert(error.message);else loadControlDiario();
 }
 async function sendControlQuestion(){
@@ -651,7 +665,7 @@ async function loadDirectionWork(){
   const q=data[0];
   const ans=prompt((q.priority==='urgent'?'URGENTE · ':'')+'Dirección pregunta:\n'+q.question,'');
   if(ans===null||!ans.trim())return;
-  await sb.from('fer_direction_questions').update({answer:ans.trim(),answered_at:new Date().toISOString(),status:'answered'}).eq('id',q.id);
+  const {error}=await sb.rpc('submit_direction_answer',{p_question_id:q.id,p_answer:ans.trim()});if(error)alert(error.message);
 }
 let notifiedDirectionIds=new Set();
 async function pollDirectionNotifications(){
