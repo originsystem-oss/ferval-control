@@ -1,4 +1,4 @@
-const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/d252ac364b0ffdedb1f2fe5c75221fbbf647326d/public/ferval-control-1.3.html';
+const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/409ef888cb9a4cfce2ae1b4be4d19bd72d834a90/public/ferval-control-1.3.html';
 const html=await (await fetch(HTML_URL,{headers:{'cache-control':'no-cache'}})).text();
 const port=Number(process.env.PORT||3000);
 
@@ -92,7 +92,7 @@ Bun.serve({
   async fetch(req){
     const u=new URL(req.url);
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'2.8-direction-routines'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'2.9-n2-pilot'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -126,4 +126,4 @@ Bun.serve({
     return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
   }
 });
-console.log('FERVAL CONTROL 2.8 routines host on',port);
+console.log('FERVAL CONTROL 2.9 N2 pilot host on',port);
