@@ -62,6 +62,7 @@
       <button id="tileGuardia" class="tile n1only"><div class="tileIcon">🚨</div><strong>Guardia Dirección</strong><span>Incidencias y bloqueos</span></button>
       <button id="tileAyuda" class="tile"><div class="tileIcon">❓</div><strong>Ayuda</strong><span>Cómo usar FERVAL CONTROL</span></button>
     </div>
+    <section id="notificationsCard" class="sectionCard"><h3>Avisos</h3><div id="homeNotifications" class="muted">Sin avisos nuevos.</div></section>
     <section class="sectionCard"><h3>Usuarios pendientes</h3><div id="homePending" class="muted">Cargando…</div></section>
     <section class="sectionCard"><h3>Historial de Dirección</h3><div id="homeAudit" class="muted">Cargando…</div></section>
   </main>
@@ -252,7 +253,7 @@
 const SB_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co', SB_KEY='sb_publishable_EChIRAIJTQouhokG-U2ENA_6nLDTYuf';
 const FN='https://jbzkofvtoyuqtlwmhiiw.supabase.co/functions/v1/ferval-control-v13';
 const sb=window.supabase.createClient(SB_URL,SB_KEY), $=id=>document.getElementById(id);
-const APP_VERSION='3.1';
+const APP_VERSION='3.2';
 let signup=false,me=null,sid='',recognition=null,listening=false,currentSupervisorThread=null;
 const views=['homeView','chatView','conversacionesView','supervisionView','equipoView','obrasView','userChatsView','historialView','guardiaView','estadoView','ayudaView'];
 function showView(id){views.forEach(v=>$(v).classList.toggle('hidden',v!==id));$('tabHome').classList.toggle('active',id==='homeView');$('tabChat').classList.toggle('active',id==='chatView')}
@@ -396,20 +397,45 @@ async function loadGuardia(){
       (e.message_excerpt?'<div class="muted" style="margin-top:7px">Mensaje: '+esc(e.message_excerpt)+'</div>':'')+
       '<div class="muted" style="margin-top:6px">Acción: '+esc(e.action_taken)+'</div>'+
       '<div class="rowActions">'+
-      (e.status==='open'?'<button class="mini" data-review-guard="'+e.id+'">Marcar revisada</button>':'')+
-      (b?'<button class="mini alt" data-unblock-guard="'+b.id+'">Desbloquear</button>':'')+
+      (e.status==='open'?'<button class="mini" data-resolve-guard="'+e.id+'" data-user="'+esc(e.user_id)+'" data-session="'+esc(e.session_key||'')+'">Cerrar + desbloquear + avisar</button>':'')+
+      '<button class="mini alt" data-manual-block="'+esc(e.user_id)+'" data-session="'+esc(e.session_key||'')+'">Bloquear 30 min</button>'+
       '</div></div>';
   }).join('')||'<div class="muted">No hay incidencias registradas.</div>';
-  document.querySelectorAll('[data-review-guard]').forEach(b=>b.onclick=async()=>{
-    const {error}=await sb.from('yayo_guard_events').update({status:'reviewed',reviewed_at:new Date().toISOString(),reviewed_by:me.user_id}).eq('id',Number(b.dataset.reviewGuard));
-    if(error)alert(error.message);else loadGuardia();
+  document.querySelectorAll('[data-resolve-guard]').forEach(b=>b.onclick=async()=>{
+    const note=prompt('Mensaje que recibirá el usuario al cerrar la incidencia:','Dirección ha revisado la incidencia y la da por cerrada como advertencia. El bloqueo temporal queda levantado. Para cualquier consulta sobre información reservada, utiliza el canal de Dirección.');
+    if(note===null)return;
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(FN+'/direction-action',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({
+      action:'resolve_guard',
+      target_user_id:b.dataset.user,
+      session_key:b.dataset.session,
+      guard_event_id:Number(b.dataset.resolveGuard),
+      note
+    })});
+    const j=await r.json();
+    if(!r.ok)alert(j.error||'No se pudo cerrar la incidencia.');else{alert('Incidencia cerrada, usuario desbloqueado y notificado.');loadGuardia()}
   });
-  document.querySelectorAll('[data-unblock-guard]').forEach(b=>b.onclick=async()=>{
-    const {error}=await sb.from('yayo_session_blocks').update({active:false}).eq('id',Number(b.dataset.unblockGuard));
-    if(error)alert(error.message);else loadGuardia();
+  document.querySelectorAll('[data-manual-block]').forEach(b=>b.onclick=async()=>{
+    const note=prompt('Motivo del bloqueo temporal:','Bloqueo temporal aplicado por Dirección.');
+    if(note===null)return;
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(FN+'/direction-action',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({
+      action:'block_user',
+      target_user_id:b.dataset.user,
+      session_key:b.dataset.session,
+      minutes:30,
+      note
+    })});
+    const j=await r.json();
+    if(!r.ok)alert(j.error||'No se pudo bloquear.');else{alert('Bloqueo temporal aplicado.');loadGuardia()}
   });
 }
-async function loadUsers(){
+async function loadNotifications(){
+  if(!me)return;
+  const {data,error}=await sb.from('yayo_user_notifications').select('id,title,body,kind,created_at,read_at').eq('user_id',me.user_id).order('created_at',{ascending:false}).limit(10);
+  if(error){$('homeNotifications').textContent='No se pudieron cargar los avisos.';return}
+  $('homeNotifications').innerHTML=(data||[]).map(n=>'<div class="auditrow"><b>'+esc(n.title)+'</b><div>'+esc(n.body)+'</div><div class="muted">'+new Date(n.created_at).toLocaleString()+'</div></div>').join('')||'Sin avisos nuevos.';
+}async function loadUsers(){
   if(me?.access_level!=='N1'){return}
   const {data,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').order('display_name');
   if(error){$('pending').innerHTML='<div class="err">'+error.message+'</div>';return}
