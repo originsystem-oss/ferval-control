@@ -1,5 +1,13 @@
-const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/9ac0930651c9888f7e40e5c97100b08f89d39d2f/public/ferval-control-1.3.html';
-const html=await (await fetch(HTML_URL,{headers:{'cache-control':'no-cache'}})).text();
+const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/f661668af0a5d23872f74d1989eaf3acc4bd9566/public/ferval-control-1.3.html';
+const SW_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/64c08ade03f553aeb83a1fe8dcbb4ba674e82e42/public/sw.js';
+const [html,sw]=await Promise.all([
+  fetch(HTML_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
+  fetch(SW_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text())
+]);
+const webpush=await import('web-push');
+if(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY){
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT||'mailto:admin@example.com',process.env.VAPID_PUBLIC_KEY,process.env.VAPID_PRIVATE_KEY);
+}
 const port=Number(process.env.PORT||3000);
 
 function crc32(bytes){
@@ -91,8 +99,29 @@ Bun.serve({
   hostname:'0.0.0.0',
   async fetch(req){
     const u=new URL(req.url);
+    if(u.pathname==='/sw.js'){
+      return new Response(sw,{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-cache','service-worker-allowed':'/'}});
+    }
+    if(u.pathname==='/api/push/send'&&req.method==='POST'){
+      const secret=req.headers.get('x-push-secret')||'';
+      if(!process.env.PUSH_INTERNAL_SECRET||secret!==process.env.PUSH_INTERNAL_SECRET)return new Response('forbidden',{status:403});
+      try{
+        const body=await req.json();
+        const sub={endpoint:body.endpoint,keys:{p256dh:body.p256dh,auth:body.auth}};
+        await webpush.sendNotification(sub,JSON.stringify({
+          title:body.title||'FERVAL CONTROL',
+          body:body.body||'Aviso de Dirección',
+          priority:body.priority||'urgent',
+          url:body.url||'/',
+          tag:body.tag||'ferval-direction'
+        }));
+        return new Response(JSON.stringify({ok:true}),{headers:{'content-type':'application/json'}});
+      }catch(e){
+        return new Response(JSON.stringify({ok:false,error:String(e)}),{status:500,headers:{'content-type':'application/json'}});
+      }
+    }
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'3.4-daily-control-alerts'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'3.5-web-push'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -126,4 +155,4 @@ Bun.serve({
     return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
   }
 });
-console.log('FERVAL CONTROL 3.4 Daily Control alerts host on',port);
+console.log('FERVAL CONTROL 3.5 web push host on',port);
