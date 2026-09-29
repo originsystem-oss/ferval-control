@@ -1,5 +1,6 @@
-const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/5f99cf89ced05621c8de309ce75d65fb4ff08f1e/public/ferval-control-1.3.html';
-const html=await fetch(HTML_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text());
+const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/main/public/ferval-control-1.3.html?stable=51';
+const html=await fetch(HTML_URL,{headers:{'cache-control':'no-store'}}).then(r=>r.text());
+if(!html.includes("APP_VERSION='5.1-STABLE'"))throw new Error('FERVAL UI version mismatch');
 const sw="self.addEventListener('install',function(){self.skipWaiting()});self.addEventListener('activate',function(){});";
 const webpush=await import('web-push');
 if(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY){
