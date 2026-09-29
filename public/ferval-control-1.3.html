@@ -807,8 +807,9 @@ async function boot(){
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
     const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia','tileControlDiario','tileAvisoUrgente'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);if(n1){$('homePendingCard').style.display='';$('homeAuditCard').style.display='';$('pushSetupCard').style.display='none'}else{$('homePendingCard').style.display='none';$('homeAuditCard').style.display='none';$('pushSetupCard').style.display=''}$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
     await loadNotifications();
-    if(n1){await loadDirectionAlerts();await loadUsers();await loadAudit()}else{await setupPushUI();await loadDirectionWork();await pollDirectionNotifications()}
+    if(n1){await loadDirectionAlerts();await loadUsers();await loadAudit()}else{await loadDirectionWork()}
     await loadHistory();showView('homeView');
+    if(!n1){setTimeout(()=>{setupPushUI().catch(()=>{});pollDirectionNotifications().catch(()=>{})},800)}
   }catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}
 }
 window.__fervalLogin=async function(){
