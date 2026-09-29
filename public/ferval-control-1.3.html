@@ -63,12 +63,10 @@
       <button id="tileChatsUsuarios" class="tile n1only"><div class="tileIcon">👁️</div><strong>Chats usuarios</strong><span>Supervisión N1</span></button>
       <button id="tileAccesos" class="tile"><div class="tileIcon">⚡</div><strong>Accesos</strong><span>Parte · Escalar · Recuerda</span></button>
       <button id="tileControlDiario" class="tile n1only"><div class="tileIcon">📋</div><strong>Control Diario</strong><span>N1 + Yayo</span></button>
-      <button id="tileAvisoUrgente" class="tile n1only"><div class="tileIcon">📣</div><strong>Aviso urgente</strong><span>Enviar a N2/N3</span></button>
       <button id="tileEstado" class="tile n1only"><div class="tileIcon">🛡️</div><strong>Estado</strong><span>Sistema y seguridad</span></button>
       <button id="tileGuardia" class="tile n1only"><div class="tileIcon">🚨</div><strong>Guardia Dirección</strong><span>Incidencias y bloqueos</span></button>
       <button id="tileAyuda" class="tile"><div class="tileIcon">❓</div><strong>Ayuda</strong><span>Cómo usar FERVAL CONTROL</span></button>
     </div>
-    <section id="pushSetupCard" class="sectionCard"><h3>🔔 Avisos urgentes</h3><div id="pushStatus" class="muted">Activa las notificaciones para recibir avisos de Dirección aunque la app esté cerrada.</div><button id="enablePushBtn" type="button" class="btn primary full" style="margin-top:10px" onclick="window.__fervalEnablePush&&window.__fervalEnablePush()">Activar notificaciones</button></section>
     <section id="notificationsCard" class="sectionCard"><h3>Avisos</h3><div id="homeNotifications" class="muted">Sin avisos nuevos.</div></section>
     <section id="homePendingCard" class="sectionCard" style="display:none"><h3>Usuarios pendientes</h3><div id="homePending" class="muted">Cargando…</div></section>
     <section id="homeAuditCard" class="sectionCard" style="display:none"><h3>Historial de Dirección</h3><div id="homeAudit" class="muted">Cargando…</div></section>
@@ -136,17 +134,6 @@
     <section id="admin" class="sectionCard">
       <div id="pending"></div>
       <div id="activeUsers"></div>
-    </section>
-  </main>
-
-  <main id="avisoUrgenteView" class="view hidden">
-    <div class="panelTitle"><button class="btn back" data-home>←</button><h2>Aviso urgente</h2><span></span></div>
-    <section class="sectionCard">
-      <div class="muted">Exclusivo Dirección N1. Envía una notificación prioritaria al dispositivo del usuario.</div>
-      <select id="urgentTarget" class="field" style="margin-top:12px"></select>
-      <textarea id="urgentText" class="field" style="min-height:120px" placeholder="Mensaje urgente de Dirección"></textarea>
-      <button id="sendUrgentBtn" class="btn primary full">📣 Enviar URGENTE</button>
-      <div id="urgentStatus" class="muted" style="margin-top:10px"></div>
     </section>
   </main>
 
@@ -494,59 +481,6 @@ function b64ToUint8Array(base64String){
   for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
   return out;
 }
-async function setupPushUI(){
-  if(!me||me.access_level==='N1')return;
-  const card=$('pushSetupCard');card.classList.remove('hidden');
-  if(!('serviceWorker'in navigator)||!('PushManager'in window)||!('Notification'in window)){
-    $('pushStatus').textContent='Este dispositivo no admite notificaciones push PWA.';
-    $('enablePushBtn').classList.add('hidden');return;
-  }
-  const reg=await navigator.serviceWorker.register('/sw.js?v=1');
-  const sub=await reg.pushManager.getSubscription();
-  if(sub&&Notification.permission==='granted'){
-    $('pushStatus').textContent='Notificaciones urgentes activadas en este dispositivo.';
-    $('enablePushBtn').textContent='Notificaciones activadas';
-    $('enablePushBtn').disabled=true;
-  }
-}
-async function enablePush(){
-  const statusEl=document.getElementById('pushStatus');
-  const btn=document.getElementById('enablePushBtn');
-  if(statusEl)statusEl.textContent='Solicitando permiso de notificaciones…';
-  if(btn)btn.textContent='Activando…';
-  try{
-    if(!me)throw new Error('Sesión de usuario no disponible. Cierra sesión y vuelve a entrar.');
-    if(!('Notification' in window))throw new Error('Notification API no disponible en este navegador.');
-    if(!('serviceWorker' in navigator))throw new Error('Service Worker no disponible.');
-    if(!('PushManager' in window))throw new Error('PushManager no disponible.');
-    const permission=await Notification.requestPermission();
-    if(permission!=='granted'){alert('Necesitas permitir notificaciones para recibir avisos urgentes con la app cerrada.');return}
-    const reg=await navigator.serviceWorker.register('/sw.js?v=1');
-    let sub=await reg.pushManager.getSubscription();
-    if(!sub){
-      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToUint8Array('BJ3k5fjPQCerGyVq9paWcfgcuaw6NMHSBG4GryoP9CSabmilpZnLQ2yq4GnwVe5jQXMDWsNSkzccgauH2KsLRBM')});
-    }
-    const j=sub.toJSON();
-    const {error}=await sb.from('fer_push_subscriptions').upsert({
-      user_id:me.user_id,
-      endpoint:j.endpoint,
-      p256dh:j.keys.p256dh,
-      auth:j.keys.auth,
-      user_agent:navigator.userAgent,
-      active:true
-    },{onConflict:'endpoint'});
-    if(error)throw error;
-    $('pushStatus').textContent='Notificaciones urgentes activadas en este dispositivo.';
-    $('enablePushBtn').textContent='Notificaciones activadas';
-    $('enablePushBtn').disabled=true;
-  }catch(e){
-    const msg='No se pudieron activar las notificaciones: '+(e?.message||e);
-    if(statusEl)statusEl.textContent=msg;
-    if(btn){btn.textContent='Reintentar activación';btn.disabled=false}
-    alert(msg);
-  }
-}
-window.__fervalEnablePush=enablePush;
 async function loadNotifications(){
   if(!me)return;
   const [general,oper]=await Promise.all([
@@ -568,29 +502,6 @@ async function loadNotifications(){
   });
 }
 
-async function loadUrgentTargets(){
-  if(me?.access_level!=='N1')return;
-  const {data,error}=await sb.from('app_profiles').select('user_id,display_name,access_level,active').neq('access_level','N1').eq('active',true).order('display_name');
-  if(error){$('urgentStatus').textContent=error.message;return}
-  $('urgentTarget').innerHTML=(data||[]).map(u=>'<option value="'+esc(u.user_id)+'">'+esc(u.display_name)+' · '+esc(u.access_level)+'</option>').join('');
-}
-async function sendUrgentDirect(){
-  if(me?.access_level!=='N1')return;
-  const target=$('urgentTarget').value,text=$('urgentText').value.trim();
-  if(!target||!text)return alert('Selecciona destinatario y escribe el aviso.');
-  $('urgentStatus').textContent='Enviando aviso urgente…';
-  const {data:{session}}=await sb.auth.getSession();
-  try{
-    const r=await fetch('/api/push/dispatch',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({
-      target_user_id:target,title:'URGENTE · Dirección',body:text,priority:'urgent',url:'/app'
-    })});
-    const j=await r.json();
-    if(!r.ok)throw new Error(j.error||'Error de envío');
-    await sb.from('fer_direction_notifications').insert({user_id:target,priority:'urgent',title:'URGENTE · Dirección',body:text,sound_required:true,vibration_required:true});
-    $('urgentStatus').textContent='Envío completado. Push enviados: '+(j.sent||0)+' · fallidos: '+(j.failed||0);
-    if((j.sent||0)>0)$('urgentText').value='';
-  }catch(e){$('urgentStatus').textContent='No se pudo enviar: '+(e?.message||e)}
-}
 async function loadControlDiario(){
   if(me?.access_level!=='N1')return;
   if(!$('controlDate').value)$('controlDate').value=new Date().toISOString().slice(0,10);
@@ -793,23 +704,16 @@ async function createNewConversation(){
 async function loadHistory(){const {data:{session}}=await sb.auth.getSession();const r=await fetch(FN+'/history?sid='+encodeURIComponent(sid),{headers:{Authorization:'Bearer '+session.access_token}});const j=await r.json();$('chat').innerHTML='';for(const x of j.history||[])add(x.content,x.role==='assistant'?'a':'u');if(!(j.history||[]).length)add('Hola, '+me.display_name+'. Estoy aquí. Puedes hablarme, escribir o usar los accesos rápidos.','a')}
 async function boot(){
   try{
-    if('serviceWorker' in navigator){
-      try{
-        const reg=await navigator.serviceWorker.register('/sw.js?v=3.7',{updateViaCache:'none'});
-        await reg.update();
-      }catch{}
-    }
     me=await profile();
     if(!me){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}
     if(!me.active){$('msg').innerHTML='<span class="err">Tu cuenta está pendiente de activación por Dirección.</span>';await sb.auth.signOut();return}
     $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.display_name;$('badge').textContent=me.access_level;
     const sessionKey='ferval_'+APP_VERSION+'_'+me.user_id;
     sid=localStorage.getItem(sessionKey)||crypto.randomUUID();localStorage.setItem(sessionKey,sid);
-    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia','tileControlDiario','tileAvisoUrgente'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);if(n1){$('homePendingCard').style.display='';$('homeAuditCard').style.display='';$('pushSetupCard').style.display='none'}else{$('homePendingCard').style.display='none';$('homeAuditCard').style.display='none';$('pushSetupCard').style.display=''}$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
+    const n1=me.access_level==='N1',n2=me.access_level==='N2',n3=me.access_level==='N3';['tileObras','tileEquipo','tileHistorial','tileEstado','tileChatsUsuarios','tileGuardia','tileControlDiario'].forEach(id=>$(id).classList.toggle('hidden',!n1));$('qEscalar').classList.toggle('hidden',n1);$('qAprende').classList.toggle('hidden',!n1);$('workChatNotice').classList.toggle('hidden',n1);if(n1){$('homePendingCard').style.display='';$('homeAuditCard').style.display=''}else{$('homePendingCard').style.display='none';$('homeAuditCard').style.display='none'}$('supervisionTileTitle').textContent=n1?'Supervisión':n2?'Mi equipo':'Mi responsable';$('supervisionTileSub').textContent=n1?'N2 ↔ N3':n2?'Trabajadores asignados':'Seguimiento operativo';
     await loadNotifications();
     if(n1){await loadDirectionAlerts();await loadUsers();await loadAudit()}else{await loadDirectionWork()}
     await loadHistory();showView('homeView');
-    if(!n1){setTimeout(()=>{setupPushUI().catch(()=>{});pollDirectionNotifications().catch(()=>{})},800)}
   }catch(e){$('msg').innerHTML='<span class="err">'+String(e.message||e)+'</span>'}
 }
 window.__fervalLogin=async function(){
@@ -860,10 +764,7 @@ $('threadReplyBtn').onclick=replySupervisorThread;
 $('tileEquipo').onclick=async()=>{await loadUsers();showView('equipoView')};
 $('tileObras').onclick=async()=>{await loadObras();showView('obrasView')};
 $('tileControlDiario').onclick=async()=>{await loadControlDiario();showView('controlDiarioView')};
-$('tileAvisoUrgente').onclick=async()=>{await loadUrgentTargets();showView('avisoUrgenteView')};
-$('sendUrgentBtn').onclick=sendUrgentDirect;
 $('sendDirectionQuestion').onclick=sendControlQuestion;
-// Push button uses direct resilient handler.
 $('controlDate').onchange=loadControlDiario;
 $('tileHistorial').onclick=async()=>{await loadAudit();showView('historialView')};
 $('tileChatsUsuarios').onclick=async()=>{await loadN1UserChats();showView('userChatsView')};
