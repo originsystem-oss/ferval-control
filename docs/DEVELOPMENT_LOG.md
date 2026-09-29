@@ -37,3 +37,27 @@ Principio operativo validado: **“Tú habla natural; yo pongo el orden.”**
 
 ### Siguiente hito
 Conectar conversación N1 con **Control Diario estructurado**, de modo que la información organizada por Yayo persista fuera del chat y alimente las fichas de Obras.
+
+
+## Hito 2026-09-29 — CORE 1.6 Control Diario operativo
+
+**Estado:** VALIDADO EN PRODUCCIÓN  
+**UI:** CORE 1.6 Control Diario N1  
+**Punto de rescate:** `stable/core-1.6-control-diario`
+
+### Circuito validado
+Conversación N1 → Yayo estructura información → Dirección valida contenido → registro persistente en `fer_control_diario` → panel Control Diario.
+
+### Primer registro real
+**ID 1 · Obra 002 — Reforma Elche Martín · 29/09/2026 · estado abierto**
+- Yeso terminado.
+- Superficie informada aprox. 80 m².
+- Problema informado: nivelación/amaestrado y diferencias de cota/espesor; no deterioro confirmado.
+- Referencia comunicada: 9 m³ de hormigón solicitados y material sobrante.
+- Previsto 30/09: Carlos, Erik y Ramón, 08:00–16:00.
+- Trabajo: preparación/limpieza del hormigón y definición de cotas.
+- Cuba para jueves: previsión condicionada, no confirmada.
+- Siguiente acción: revisar preparación/cotas y decidir si procede contratar cuba.
+
+### Regla aprendida
+`PARTE:` no sustituye a Control Diario. Los partes/check-ins y el Control Diario son circuitos distintos. Control Diario pertenece a N1 + Yayo y debe persistir en su tabla específica.
