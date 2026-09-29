@@ -1,4 +1,4 @@
-const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/83bb134c018096949eba1a4986ff1f1226f81c60/public/ferval-control-1.3.html';
+const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/be0436e7ba1745893b9f00a8da579c98f99063ce/public/ferval-control-1.3.html';
 const SW_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/7e4d7f958e7819aa7e1d702665f694cdb4be831c/public/sw.js';
 const [html,sw]=await Promise.all([
   fetch(HTML_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
@@ -137,7 +137,7 @@ Bun.serve({
       }
     }
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'4.5-login-recovery'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'4.6-stable-login'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -169,12 +169,12 @@ Bun.serve({
       }
     }
     if(u.pathname==='/app'||u.pathname==='/app/'){
-      return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','pragma':'no-cache','expires':'0','x-ferval-version':'4.5'}});
+      return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','pragma':'no-cache','expires':'0','x-ferval-version':'4.6'}});
     }
     if(u.pathname==='/'){
-      return Response.redirect(new URL('/app?v=4.5',u.origin),302);
+      return Response.redirect(new URL('/app?v=4.6',u.origin),302);
     }
-    return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','x-ferval-version':'4.5'}});
+    return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','x-ferval-version':'4.6'}});
   }
 });
-console.log('FERVAL CONTROL 4.5 login recovery host on',port);
+console.log('FERVAL CONTROL 4.6 stable login host on',port);
