@@ -1,9 +1,6 @@
 const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/c8ba5dfaa60b7e05b76d558b2124aa9625658792/public/ferval-control-1.3.html';
-const SW_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/7e4d7f958e7819aa7e1d702665f694cdb4be831c/public/sw.js';
-const [html,sw]=await Promise.all([
-  fetch(HTML_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
-  fetch(SW_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text())
-]);
+const html=await fetch(HTML_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text());
+const sw="self.addEventListener('install',function(){self.skipWaiting()});self.addEventListener('activate',function(){});";
 const webpush=await import('web-push');
 if(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY){
   webpush.setVapidDetails(process.env.VAPID_SUBJECT||'mailto:admin@example.com',process.env.VAPID_PUBLIC_KEY,process.env.VAPID_PRIVATE_KEY);
@@ -147,7 +144,7 @@ Bun.serve({
       }
     }
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'5.0-stable-core'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'5.1-safari-first'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -187,4 +184,4 @@ Bun.serve({
     return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','x-ferval-version':'4.6'}});
   }
 });
-console.log('FERVAL CONTROL 5.0 STABLE CORE host on',port);
+console.log('FERVAL CONTROL 5.1 SAFARI FIRST host on',port);
