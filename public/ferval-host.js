@@ -1,5 +1,5 @@
 const port=Number(process.env.PORT||3000);
-const CORE_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/0f6127f6662a19635609f7b64e43d5887bb93c48/public/ferval-core-stable.html';
+const CORE_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/1f770f22162865a1917ee2cf9705bc0786e0e874/public/ferval-core-stable.html';
 let core=await fetch(CORE_URL,{headers:{'cache-control':'no-store'}}).then(async r=>{if(!r.ok)throw new Error('core '+r.status);return r.text()});
 core=core.replace('__SUPABASE_KEY__',process.env.SUPABASE_PUBLISHABLE_KEY||'');
 if(!core.includes('Núcleo estable'))throw new Error('FERVAL core mismatch');
