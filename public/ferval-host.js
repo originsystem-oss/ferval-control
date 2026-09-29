@@ -9,6 +9,13 @@ if(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY){
   webpush.setVapidDetails(process.env.VAPID_SUBJECT||'mailto:admin@example.com',process.env.VAPID_PUBLIC_KEY,process.env.VAPID_PRIVATE_KEY);
 }
 const port=Number(process.env.PORT||3000);
+const LOGIN_HTML=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FERVAL CONTROL · Acceso</title>
+<style>body{margin:0;background:#07111f;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;display:grid;place-items:center}.card{width:min(90vw,420px);background:#101b2d;border:1px solid #263449;border-radius:20px;padding:24px}h1{margin:0 0 6px}.muted{color:#94a3b8;margin-bottom:18px}input,button{width:100%;box-sizing:border-box;margin:6px 0;padding:14px;border-radius:12px;font:inherit}input{background:#0b1627;border:1px solid #334155;color:#fff}button{border:0;background:#2563eb;color:#fff;font-weight:800}.msg{min-height:24px;margin-top:8px}.err{color:#fca5a5}.ok{color:#86efac}</style></head><body><div class="card"><h1>FERVAL CONTROL</h1><div class="muted">Acceso seguro · diagnóstico 4.7</div><input id="email" type="email" placeholder="Correo"><input id="pass" type="password" placeholder="Contraseña"><button id="login">Entrar</button><div id="msg" class="msg"></div></div>
+<script type="module">
+import{createClient}from'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const sb=createClient('${process.env.SUPABASE_URL||""}','${process.env.SUPABASE_PUBLISHABLE_KEY||""}',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const btn=document.getElementById('login'),msg=document.getElementById('msg');
+btn.addEventListener('click',async()=>{btn.disabled=true;btn.textContent='Entrando…';msg.textContent='';try{const email=document.getElementById('email').value.trim(),password=document.getElementById('pass').value;if(!email||!password)throw new Error('Introduce correo y contraseña.');const{error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;msg.innerHTML='<span class="ok">Autenticación correcta. Abriendo FERVAL CONTROL…</span>';setTimeout(()=>location.href='/app?v=4.7',350)}catch(e){msg.innerHTML='<span class="err">'+String(e.message||e).replace(/[<>&]/g,'')+'</span>'}finally{btn.disabled=false;btn.textContent='Entrar'}});</script></body></html>`;
 
 function crc32(bytes){
   let c=0xffffffff;
@@ -99,6 +106,9 @@ Bun.serve({
   hostname:'0.0.0.0',
   async fetch(req){
     const u=new URL(req.url);
+    if(u.pathname==='/login'){
+      return new Response(LOGIN_HTML,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate'}});
+    }
     if(u.pathname==='/sw.js'){
       return new Response(sw,{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-cache','service-worker-allowed':'/'}});
     }
@@ -137,7 +147,7 @@ Bun.serve({
       }
     }
     if(u.pathname==='/health'){
-      return new Response(JSON.stringify({ok:true,version:'4.6-stable-login'}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true,version:'4.7-isolated-auth'}),{headers:{'content-type':'application/json'}});
     }
     if(u.pathname==='/apple-touch-icon.png'){
       return new Response(icon180,{headers:{'content-type':'image/png','cache-control':'public,max-age=3600'}});
@@ -177,4 +187,4 @@ Bun.serve({
     return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, no-cache, must-revalidate, max-age=0','x-ferval-version':'4.6'}});
   }
 });
-console.log('FERVAL CONTROL 4.6 stable login host on',port);
+console.log('FERVAL CONTROL 4.7 isolated auth host on',port);
