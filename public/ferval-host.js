@@ -1,4 +1,4 @@
-const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/be0436e7ba1745893b9f00a8da579c98f99063ce/public/ferval-control-1.3.html';
+const HTML_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/0d7450c2f953935e1bb485a2d5e07cb4709faafd/public/ferval-control-1.3.html';
 const SW_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/7e4d7f958e7819aa7e1d702665f694cdb4be831c/public/sw.js';
 const [html,sw]=await Promise.all([
   fetch(HTML_URL,{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
