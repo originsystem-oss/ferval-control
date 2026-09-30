@@ -61,3 +61,29 @@ Conversación N1 → Yayo estructura información → Dirección valida contenid
 
 ### Regla aprendida
 `PARTE:` no sustituye a Control Diario. Los partes/check-ins y el Control Diario son circuitos distintos. Control Diario pertenece a N1 + Yayo y debe persistir en su tabla específica.
+
+
+## Hito 2026-09-30 — Yayo Pulse 0.1 · primer latido real
+
+**Estado:** VALIDADO EN PRODUCCIÓN  
+**UI:** CORE 1.8 Yayo Pulse manual  
+**Backend:** Yayo v25  
+**Punto de rescate:** `stable/core-1.8-yayo-pulse-01`
+
+### Primer latido
+Pulse ejecutado manualmente desde N1. Resultado: **3 asuntos abiertos** detectados en tres sistemas diferentes:
+1. **Control Diario:** Obra 002 abierta; comprobar preparación/cotas y decidir si procede la cuba.
+2. **Pregunta de Dirección:** horarios realizados en Elche.
+3. **Escalado:** solicitud N2 de información financiera reservada detectada por Direction Guard.
+
+### Validación
+Pulse 0.1 demuestra lectura transversal y persistente sin ejecutar decisiones ni modificar los asuntos detectados.
+
+### Limitaciones conocidas
+- La pregunta de horarios ya dispone de información posterior (08:00–16:00), pero Pulse 0.1 todavía no reconcilia automáticamente recencia/resolución.
+- La interfaz muestra tipos técnicos (`control_diario`, `pregunta_direccion`, `escalado`) en lugar de etiquetas humanas.
+- Pulse permanece manual; no tiene reloj propio.
+- No cierra, modifica, notifica ni ejecuta decisiones.
+
+### Siguiente versión
+Pulse 0.2: reconciliación de asuntos con información posterior validada + nombres humanos de obra/tipo + propuesta de cierre, manteniendo aprobación N1 para cualquier cambio.
