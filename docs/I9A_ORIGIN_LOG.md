@@ -65,3 +65,23 @@ Separación funcional:
 - **N1 Dirección:** autoridad final sobre validación y decisiones sensibles.
 
 Esta separación evita que la generación de escenarios se convierta accidentalmente en ejecución empresarial.
+
+
+## Caso 001 — Validación de ejecución I9A · 30/09/2026
+
+**Estado:** PRIMER CIRCUITO I9A PERSISTIDO.
+
+Tras aislar I9A de Pulse se identificó que Supabase Edge no disponía de `OPENAI_API_KEY`, mientras Yayo conversacional utilizaba el relay de IA desplegado en Railway. Se reconectó el análisis aislado al mismo relay.
+
+**Circuito demostrado:** Control Diario #1 → T0 → motor I9A → 3 variantes → persistencia en `i9a_decision_reviews`.
+
+**Resultado:** review #1, Obra 002 · Reforma Elche — Martín, estado `draft`.
+
+Variantes generadas:
+1. Revisión presencial hacia mediodía y decisión en obra.
+2. Validación documentada desde obra antes de decidir.
+3. Mantener la cuba sin confirmar hasta completar cotas y definición de ejecución.
+
+Cada variante conserva tradeoffs de tiempo, coste, riesgo, dependencias y reversibilidad. El análisis indicó explícitamente información no disponible y no seleccionó una variante ganadora.
+
+**Aprendizaje de arquitectura:** un subsistema no debe depender implícitamente de credenciales o rutas de modelo distintas de las del núcleo conversacional. La prueba aislada permitió separar un fallo de infraestructura de un fallo metodológico I9A.
