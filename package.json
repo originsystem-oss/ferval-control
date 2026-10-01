@@ -1,1 +1,15 @@
-{"name":"ferval-control","version":"1.0.0","private":true,"type":"module","scripts":{"start":"node server.js"},"engines":{"node":">=20"}}
+{
+  "name": "ferval-control",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "web-push": "3.6.7"
+  }
+}
