@@ -1,9 +1,18 @@
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import webpush from "web-push";
 
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+const VAPID_PUBLIC_KEY=process.env.IAYO_VAPID_PUBLIC_KEY||"";
+const VAPID_PRIVATE_KEY=process.env.IAYO_VAPID_PRIVATE_KEY||"";
+if(VAPID_PUBLIC_KEY&&VAPID_PRIVATE_KEY) webpush.setVapidDetails("mailto:direccion@ferval.local",VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY);
+const PUBLIC_DIR=path.join(process.cwd(),"public");
+const mime={".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8",".html":"text/html; charset=utf-8",".svg":"image/svg+xml"};
+function staticFile(res,file,type){try{const b=fs.readFileSync(path.join(PUBLIC_DIR,file));res.writeHead(200,{"content-type":type||mime[path.extname(file)]||"application/octet-stream","cache-control":"no-store"});res.end(b);return true}catch{return false}}
 
 const json=(res,status,obj)=>{res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store"});res.end(JSON.stringify(obj));};
 const bearer=req=>{const h=String(req.headers.authorization||"");return h.startsWith("Bearer ")?h.slice(7):"";};
@@ -80,7 +89,11 @@ boot();
 </script></body></html>`;
 
 http.createServer(async(req,res)=>{
-  if(req.method==="GET"&&req.url==="/"){res.writeHead(200,{"content-type":"text/html; charset=utf-8"});return res.end(page)}
+  if(req.method==="GET"&&req.url==="/"){try{let h=fs.readFileSync(path.join(PUBLIC_DIR,"ferval-core-stable.html"),"utf8").replaceAll("__SUPABASE_KEY__",SUPABASE_KEY||"");res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store"});return res.end(h)}catch{res.writeHead(200,{"content-type":"text/html; charset=utf-8"});return res.end(page)}}
+  if(req.method==="GET"&&req.url==="/sw.js"){if(staticFile(res,"sw.js","text/javascript; charset=utf-8"))return}
+  if(req.method==="GET"&&req.url==="/manifest.webmanifest"){if(staticFile(res,"manifest.webmanifest","application/manifest+json; charset=utf-8"))return}
+  if(req.method==="GET"&&req.url==="/iayo-icon.svg"){if(staticFile(res,"iayo-icon.svg","image/svg+xml"))return}
+  if(req.method==="GET"&&req.url==="/api/iayo-push/config")return json(res,200,{publicKey:VAPID_PUBLIC_KEY,ready:Boolean(VAPID_PUBLIC_KEY&&VAPID_PRIVATE_KEY)});
   if(req.method==="GET"&&req.url==="/health")return json(res,200,{ok:true,auth:"supabase",version:"hardening-2"});
 
   if(req.method==="POST"&&req.url==="/api/signup"){
@@ -125,6 +138,17 @@ http.createServer(async(req,res)=>{
   if(user&&profile&&!profile.active)return json(res,403,{error:"Tu cuenta está pendiente de activación por Dirección."});
 
   if(req.method==="GET"&&req.url==="/api/me")return json(res,200,{user_id:user.id,display_name:profile.display_name,access_level:profile.access_level});
+
+  if(req.method==="POST"&&req.url==="/api/iayo-push/test"){
+    if(profile.access_level!=="N1")return json(res,403,{error:"Sólo Dirección N1 puede lanzar la prueba IAYO PUSH."});
+    if(!VAPID_PUBLIC_KEY||!VAPID_PRIVATE_KEY)return json(res,503,{error:"VAPID no configurado."});
+    const rows=await sb("iayo_push_subscriptions?user_id=eq."+encodeURIComponent(user.id)+"&active=eq.true&select=id,subscription",token);
+    if(!rows.length)return json(res,409,{error:"Este usuario todavía no tiene dispositivo PUSH registrado."});
+    const payload=JSON.stringify({title:"IAYO · FERVAL CONTROL",body:"PUSH 0.1 operativo. IAYO puede avisarte con la app cerrada.",url:"/?iayo=push-test",priority:"urgent",badge:1,tag:"iayo-push-01"});
+    const results=[];
+    for(const row of rows){try{const rr=await webpush.sendNotification(row.subscription,payload,{TTL:60,urgency:"high"});results.push({id:row.id,ok:true,status:rr.statusCode})}catch(e){results.push({id:row.id,ok:false,status:e.statusCode||0,error:String(e.body||e.message||e).slice(0,300)})}}
+    return json(res,results.some(x=>x.ok)?200:502,{ok:results.some(x=>x.ok),results});
+  }
 
   if(req.method==="GET"&&req.url.startsWith("/api/history")){
     const u=new URL(req.url,"http://localhost"),sid=u.searchParams.get("sid")||"";
