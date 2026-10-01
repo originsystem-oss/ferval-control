@@ -1,10 +1,13 @@
-const SW_VERSION='3.7';
+const SW_VERSION='IAYO-PUSH-0.1';
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('push',event=>{
   let data={title:'FERVAL CONTROL',body:'Tienes un aviso de Dirección.',url:'/'};
   try{data={...data,...event.data.json()}}catch{}
-  event.waitUntil(self.registration.showNotification(data.title,{
+  const badgeCount=Number.isFinite(Number(data.badge))?Math.max(0,Number(data.badge)):1;
+  const jobs=[];
+  if('setAppBadge' in self.navigator) jobs.push(badgeCount>0?self.navigator.setAppBadge(badgeCount):self.navigator.clearAppBadge());
+  jobs.push(self.registration.showNotification(data.title,{
     body:data.body,
     icon:'/icon-192.png?v=2.2',
     badge:'/icon-192.png?v=2.2',
@@ -13,8 +16,9 @@ self.addEventListener('push',event=>{
     requireInteraction:data.priority==='urgent',
     silent:false,
     vibrate:data.priority==='urgent'?[300,120,300,120,500]:[180],
-    data:{url:data.url||'/'}
+    data:{url:data.url||'/',iayo:true}
   }));
+  event.waitUntil(Promise.all(jobs));
 });
 self.addEventListener('notificationclick',event=>{
   event.notification.close();
