@@ -1,0 +1,18 @@
+{
+  "id": "/fer-control-iayo",
+  "name": "FERVAL CONTROL · IAYO",
+  "short_name": "FERVAL",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": [
+    {
+      "src": "/iayo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
