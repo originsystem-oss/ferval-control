@@ -1,0 +1,41 @@
+{
+  "version": "0.1",
+  "product": "IAYO PRIVATE",
+  "access": {
+    "mode": "single_owner",
+    "corporate_roles": false
+  },
+  "boundaries": {
+    "import_ferval_by_default": false,
+    "employee_data": false,
+    "cross_app_bridge": "explicit_only"
+  },
+  "layers": [
+    "identity",
+    "conversation",
+    "memory",
+    "state",
+    "reflection",
+    "outcomes",
+    "initiative",
+    "push",
+    "voice",
+    "i9a"
+  ],
+  "autonomy": {
+    "default": "propose",
+    "irreversible_actions": "owner_confirmation",
+    "audit": true
+  },
+  "memory": {
+    "provenance": true,
+    "validation": true,
+    "separate_observation_from_fact": true
+  },
+  "push": {
+    "opt_in": true,
+    "badge": true,
+    "background": true,
+    "non_blocking": true
+  }
+}
