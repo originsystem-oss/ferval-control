@@ -1,0 +1,10 @@
+{
+  "name": "IAYO PRIVATE",
+  "short_name": "IAYO",
+  "id": "/iayo-private",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#05070d",
+  "theme_color": "#05070d"
+}
