@@ -45,7 +45,11 @@ async function buildContext(profile,token){
     sb("yayo_capabilities?select=capability_key,enabled,description,risk_level,requires_n1&order=id",token)
   ]);
   const base={usuario:{nombre:profile.display_name,nivel:profile.access_level},memoriaUsuario:userMem,capacidades:allowedCapabilities(caps,profile.access_level)};
-  if(profile.access_level==="N3")return base;
+  if(profile.access_level==="N3"){
+    const r=await sbWrite("rpc/get_my_operational_works","POST",{},token,"return=representation");
+    const obras=Array.isArray(r.data)?r.data:[];
+    return {...base,obrasOperativas:obras};
+  }
   if(profile.access_level==="N2"){
     const r=await sbWrite("rpc/get_operational_obras","POST",{},token,"return=representation");
     const obras=Array.isArray(r.data)?r.data:[];
@@ -163,6 +167,47 @@ http.createServer(async(req,res)=>{
 
     if(!OPENAI_API_KEY)return json(res,503,{error:"Falta configurar OPENAI_API_KEY."});
     try{
+      if(profile.access_level==="N3"){
+        const wr=await sbWrite("rpc/get_my_operational_works","POST",{},token,"return=representation");
+        const works=Array.isArray(wr.data)?wr.data:[];
+        const reportCue=/\b(parte|he hecho|hemos hecho|trabaj(?:e|é|amos|ado)|hoy en|material(?:es)?|incidencia|horas?)\b/i.test(message);
+        if(reportCue&&works.length){
+          const extractorInstructions=[
+            "Analiza el mensaje de un trabajador N3 de FERVAL CONTROL.",
+            "Decide si está intentando REGISTRAR un parte de trabajo ya realizado. No registres planes, preguntas ni conversaciones generales.",
+            "Devuelve SOLO JSON válido con: intent (boolean), obra_id (uuid o null), fecha (YYYY-MM-DD o null), descripcion, horas (number o 0), incidencias, trabajos_realizados, materiales_usados, decisiones_tecnicas, clima, needs_clarification (boolean), clarification (string).",
+            "Sólo puedes elegir obra_id de OBRAS_AUTORIZADAS. Si hay una sola obra autorizada y el mensaje habla inequívocamente del trabajo de hoy, puedes usarla. Si hay varias y no queda clara, needs_clarification=true.",
+            "No inventes horas, materiales, incidencias ni detalles.",
+            "OBRAS_AUTORIZADAS: "+JSON.stringify(works)
+          ].join("\n");
+          const er=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:"Bearer "+OPENAI_API_KEY,"content-type":"application/json"},body:JSON.stringify({model:"gpt-5.6",instructions:extractorInstructions,input:[{role:"user",content:message}],text:{format:{type:"json_object"}}})});
+          const ed=await er.json();
+          if(er.ok){
+            const raw=ed.output_text||(ed.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==="output_text").map(x=>x.text).join("");
+            let x=null;try{x=JSON.parse(raw)}catch{}
+            if(x?.intent){
+              if(x.needs_clarification||!x.obra_id){
+                const reply=x.clarification||"¿De qué obra es este parte?";
+                await sbWrite("yayo_session_messages","POST",{session_key:sid,role:"assistant",body:reply},token);
+                return json(res,200,{reply,work_report:{status:"needs_clarification"}});
+              }
+              if(!works.some(w=>w.id===x.obra_id)){
+                const reply="No puedo registrar ese parte: esa obra no está asignada a tu usuario para hoy.";
+                await sbWrite("yayo_session_messages","POST",{session_key:sid,role:"assistant",body:reply},token);
+                return json(res,200,{reply,work_report:{status:"denied"}});
+              }
+              const rr=await sbWrite("rpc/submit_own_work_report","POST",{p_obra_id:x.obra_id,p_fecha:x.fecha||null,p_descripcion:x.descripcion||null,p_horas:Number(x.horas)||0,p_incidencias:x.incidencias||null,p_trabajos_realizados:x.trabajos_realizados||null,p_materiales_usados:x.materiales_usados||null,p_decisiones_tecnicas:x.decisiones_tecnicas||null,p_clima:x.clima||null},token,"return=representation");
+              if(rr.ok){
+                const reportId=Array.isArray(rr.data)?rr.data[0]:rr.data;
+                const obra=works.find(w=>w.id===x.obra_id);
+                const reply="Parte registrado en "+(obra?.codigo?obra.codigo+" · ":"")+(obra?.nombre||"tu obra")+". Referencia: "+String(reportId||"registrado")+".";
+                await sbWrite("yayo_session_messages","POST",{session_key:sid,role:"assistant",body:reply},token);
+                return json(res,200,{reply,work_report:{status:"registered",id:reportId,obra_id:x.obra_id}});
+              }
+            }
+          }
+        }
+      }
       const context=await buildContext(profile,token);
       const input=[...history,{role:"user",content:message}];
       const instructions=[
