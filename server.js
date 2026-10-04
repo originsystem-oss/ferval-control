@@ -88,7 +88,29 @@ el("f").onsubmit=async e=>{e.preventDefault();const m=i.value.trim();if(!m)retur
 boot();
 </script></body></html>`;
 
-http.createServer(async(req,res)=>{
+const IAYO_PUSH_POLICY={cooldownMs:30*60*1000,maxBody:220,severity:{critical:4,high:3,medium:2,low:1}};
+const iayoPushCooldown=new Map();
+function classifyIayoAlert(input={}){
+  const severity=String(input.severity||"medium").toLowerCase();
+  const category=String(input.category||"operational").toLowerCase();
+  const title=String(input.title||"IAYO requiere Dirección").slice(0,90);
+  const body=String(input.body||input.reason||"Hay un asunto que requiere revisión de Dirección.").slice(0,IAYO_PUSH_POLICY.maxBody);
+  const requiresDecision=Boolean(input.requiresDecision||input.requires_decision);
+  const urgent=severity==="critical"||severity==="high";
+  const allowed=urgent||requiresDecision;
+  return {allowed,severity,category,title,body,requiresDecision,priority:urgent?"urgent":"normal"};
+}
+async function sendIayoPushToN1(alert,token){
+  if(!VAPID_PUBLIC_KEY||!VAPID_PRIVATE_KEY)return {ok:false,error:"VAPID no configurado"};
+  const n1=await sb("app_profiles?access_level=eq.N1&active=eq.true&select=user_id",token);
+  const results=[];
+  for(const p of n1){
+    const rows=await sb("iayo_push_subscriptions?user_id=eq."+encodeURIComponent(p.user_id)+"&active=eq.true&select=id,subscription",token);
+    for(const row of rows){try{const payload=JSON.stringify({title:alert.title,body:alert.body,url:"/?iayo=alert&category="+encodeURIComponent(alert.category),priority:alert.priority,badge:1,tag:"iayo-"+alert.category});const rr=await webpush.sendNotification(row.subscription,payload,{TTL:300,urgency:alert.priority==="urgent"?"high":"normal"});results.push({id:row.id,ok:true,status:rr.statusCode})}catch(e){results.push({id:row.id,ok:false,status:e.statusCode||0})}}
+  }
+  return {ok:results.some(x=>x.ok),results};
+}
+\nhttp.createServer(async(req,res)=>{
   if(req.method==="GET"&&req.url==="/"){try{let h=fs.readFileSync(path.join(PUBLIC_DIR,"ferval-core-stable.html"),"utf8").replaceAll("__SUPABASE_KEY__",SUPABASE_KEY||"");res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store"});return res.end(h)}catch{res.writeHead(200,{"content-type":"text/html; charset=utf-8"});return res.end(page)}}
   if(req.method==="GET"&&req.url==="/sw.js"){if(staticFile(res,"sw.js","text/javascript; charset=utf-8"))return}
   if(req.method==="GET"&&req.url==="/manifest.webmanifest"){if(staticFile(res,"manifest.webmanifest","application/manifest+json; charset=utf-8"))return}
@@ -138,6 +160,18 @@ http.createServer(async(req,res)=>{
   if(user&&profile&&!profile.active)return json(res,403,{error:"Tu cuenta está pendiente de activación por Dirección."});
 
   if(req.method==="GET"&&req.url==="/api/me")return json(res,200,{user_id:user.id,display_name:profile.display_name,access_level:profile.access_level});
+
+  if(req.method==="POST"&&req.url==="/api/iayo-push/escalate"){
+    if(profile.access_level!=="N1"&&profile.access_level!=="N2")return json(res,403,{error:"Nivel sin permiso para escalar a Dirección."});
+    let input;try{input=await readBody(req)}catch{return json(res,400,{error:"Alerta inválida."})}
+    const alert=classifyIayoAlert(input);
+    if(!alert.allowed)return json(res,202,{ok:true,pushed:false,reason:"No supera el umbral de interrupción de Dirección.",classification:alert});
+    const fingerprint=[alert.category,alert.title,alert.body].join("|").toLowerCase();const last=iayoPushCooldown.get(fingerprint)||0;
+    if(Date.now()-last<IAYO_PUSH_POLICY.cooldownMs)return json(res,202,{ok:true,pushed:false,reason:"Alerta equivalente ya enviada recientemente.",classification:alert});
+    iayoPushCooldown.set(fingerprint,Date.now());
+    const sent=await sendIayoPushToN1(alert,token);
+    return json(res,sent.ok?200:202,{ok:true,pushed:sent.ok,classification:alert,delivery:sent});
+  }
 
   if(req.method==="POST"&&req.url==="/api/iayo-push/test"){
     if(profile.access_level!=="N1")return json(res,403,{error:"Sólo Dirección N1 puede lanzar la prueba IAYO PUSH."});
