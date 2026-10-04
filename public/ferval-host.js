@@ -1,5 +1,5 @@
 const port=Number(process.env.PORT||3000);
-const CORE_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/stable/core-1.9-conversation-recovery/public/ferval-core-stable.html';
+const CORE_URL='https://raw.githubusercontent.com/originsystem-oss/ferval-control/621d9c5c326118fa61c8a2a261d0ca649647b7a7/public/ferval-core-stable.html';
 let core=await fetch(CORE_URL,{headers:{'cache-control':'no-store'}}).then(async r=>{if(!r.ok)throw new Error('core '+r.status);return r.text()});
 core=core.replace('__SUPABASE_KEY__',process.env.SUPABASE_PUBLISHABLE_KEY||'');
 if(!core.includes('Núcleo estable'))throw new Error('FERVAL core mismatch');
