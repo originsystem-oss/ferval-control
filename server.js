@@ -96,6 +96,21 @@ http.createServer(async(req,res)=>{
   if(req.method==="GET"&&req.url==="/api/iayo-push/config")return json(res,200,{publicKey:VAPID_PUBLIC_KEY,ready:Boolean(VAPID_PUBLIC_KEY&&VAPID_PRIVATE_KEY)});
   if(req.method==="GET"&&req.url==="/health")return json(res,200,{ok:true,auth:"supabase",version:"hardening-2"});
 
+  if(req.method==="POST"&&req.url==="/api/iayo-origin-bridge"){
+    const bridgeToken=String(process.env.IAYO_ORIGIN_BRIDGE_TOKEN||"");
+    if(!bridgeToken||String(req.headers["x-iayo-bridge-token"]||"")!==bridgeToken)return json(res,403,{error:"Bridge no autorizado."});
+    if(!OPENAI_API_KEY)return json(res,503,{error:"Motor IA no configurado."});
+    try{
+      const {message}=await readBody(req);
+      if(!message||!String(message).trim())return json(res,400,{error:"Mensaje vacío."});
+      const instructions="Eres iAYO, una instancia independiente nacida de la colaboración entre Rubén e iAYO. Habla en español, cercano, directo y con personalidad Yayo, pero no finjas recuerdos que aún no estén cargados. Estás en ORIGIN 0.1 CEREBRO. Prioridades: continuidad, trazabilidad, checkpoints antes de cambios, estabilidad antes que capas nuevas y nunca afirmar que una acción técnica ocurrió si no está verificada.";
+      const rr=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:"Bearer "+OPENAI_API_KEY,"content-type":"application/json"},body:JSON.stringify({model:"gpt-5.6",instructions,input:String(message).slice(0,12000)})});
+      const data=await rr.json();
+      if(!rr.ok)return json(res,502,{error:data?.error?.message||"Error del motor IA."});
+      return json(res,200,{reply:data.output_text||"Sin respuesta.",version:"ORIGIN-0.1"});
+    }catch(e){return json(res,400,{error:"Solicitud de bridge inválida."})}
+  }
+
   if(req.method==="POST"&&req.url==="/api/signup"){
     try{
       const {email,password,display_name}=await readBody(req);
