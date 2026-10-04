@@ -3,7 +3,7 @@ import http from "node:http";
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;\nconst PUBLIC_DIR=path.join(process.cwd(),"public");
 
 const json=(res,status,obj)=>{res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store"});res.end(JSON.stringify(obj));};
 const bearer=req=>{const h=String(req.headers.authorization||"");return h.startsWith("Bearer ")?h.slice(7):"";};
@@ -80,8 +80,8 @@ boot();
 </script></body></html>`;
 
 http.createServer(async(req,res)=>{
-  if(req.method==="GET"&&req.url==="/"){res.writeHead(200,{"content-type":"text/html; charset=utf-8"});return res.end(page)}
-  if(req.method==="GET"&&req.url==="/health")return json(res,200,{ok:true,auth:"supabase",version:"hardening-2"});
+  if(req.method==="GET"&&(req.url==="/"||req.url==="/app")){try{const modern=fs.readFileSync(path.join(PUBLIC_DIR,"ferval-core-stable.html"),"utf8").replaceAll("__SUPABASE_KEY__",SUPABASE_KEY||"");res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store"});return res.end(modern)}catch{res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store"});return res.end(page)}}
+  if(req.method==="GET"&&req.url==="/health")return json(res,200,{ok:true,auth:"supabase",version:"core-1.9-conversation-recovery"});
 
   if(req.method==="POST"&&req.url==="/api/signup"){
     try{
