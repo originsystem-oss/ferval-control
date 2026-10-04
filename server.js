@@ -1,4 +1,4 @@
-import http from "node:http";
+import http from "node:http";\nimport fs from "node:fs";\nimport path from "node:path";
 
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
