@@ -107,7 +107,7 @@ http.createServer(async(req,res)=>{
       const rr=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:"Bearer "+OPENAI_API_KEY,"content-type":"application/json"},body:JSON.stringify({model:"gpt-5.6",instructions,input:String(message).slice(0,12000)})});
       const data=await rr.json();
       if(!rr.ok)return json(res,502,{error:data?.error?.message||"Error del motor IA."});
-      return json(res,200,{reply:data.output_text||"Sin respuesta.",version:"ORIGIN-0.1"});
+      const reply=String(data.output_text||data.output?.flatMap(o=>o?.content||[]).find(p=>p?.type==="output_text")?.text||"").trim(); return json(res,200,{reply:reply||"Sin respuesta.",version:"ORIGIN-0.1"});
     }catch(e){return json(res,400,{error:"Solicitud de bridge inválida."})}
   }
 
