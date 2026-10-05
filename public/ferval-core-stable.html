@@ -19,7 +19,7 @@
 <main id="moduleView" class="view hidden"><button id="backHome" class="btn secondary back">← Inicio</button><div class="soon"><h2 id="moduleTitle"></h2><div id="moduleText" class="muted">Módulo preparado visualmente. Se activará sobre el núcleo estable después de su prueba individual.</div><div id="moduleContent"></div></div></main>
 <nav class="nav"><button id="navHome" class="active">⌂ Inicio</button><button id="navChat">▢ Conversación</button><button id="navMenu">☰ Menú</button></nav>
 </div><script type="module">
-import{createClient}from'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import{createClient}from'https://esm.sh/@supabase/supabase-js@2?bundle';
 const SUPABASE_URL='https://jbzkofvtoyuqtlwmhiiw.supabase.co';
 const SUPABASE_KEY='__SUPABASE_KEY__';
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
